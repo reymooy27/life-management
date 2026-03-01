@@ -1,6 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
+import ExerciseScreen from './src/screens/ExerciseScreen';
+import FinanceScreen from './src/screens/FinanceScreen';
 import FoodScreen from './src/screens/FoodScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import { RootStackParamList } from './src/types/navigation';
@@ -18,7 +20,30 @@ export default function App() {
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Food" component={FoodScreen} />
+        <Stack.Screen
+          name="Food"
+          component={FoodScreen}
+          options={{
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="Exercise"
+          component={ExerciseScreen}
+          options={{
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="Money"
+          component={FinanceScreen}
+          options={{
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
