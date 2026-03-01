@@ -1,12 +1,19 @@
 import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase | null = null;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  db = await SQLite.openDatabaseAsync('lifeflow.db');
-  await initializeTables(db);
-  return db;
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      const database = await SQLite.openDatabaseAsync('lifeflow.db');
+      await initializeTables(database);
+      db = database;
+      return database;
+    })();
+  }
+  return dbPromise;
 }
 
 async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> {
@@ -166,4 +173,13 @@ export async function getMonthlyExpenses(yearMonth: string): Promise<ExpenseEntr
 export async function deleteExpense(id: number): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('DELETE FROM expense_entries WHERE id = ?', [id]);
+}
+
+export async function getYearlyExpenses(year: number): Promise<ExpenseEntryRow[]> {
+  const database = await getDatabase();
+  const prefix = `${year}-`;
+  return await database.getAllAsync<ExpenseEntryRow>(
+    "SELECT * FROM expense_entries WHERE date LIKE ? || '%' ORDER BY date DESC, id DESC",
+    [prefix]
+  );
 }

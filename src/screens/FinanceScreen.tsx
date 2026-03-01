@@ -1,31 +1,32 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ExpenseBarChart from '../components/ExpenseBarChart';
+import YearlyBarChart from '../components/YearlyBarChart';
 import {
-    addExpense,
-    deleteExpense,
-    ExpenseEntryRow,
-    getMonthlyExpenses,
+  deleteExpense,
+  ExpenseEntryRow,
+  getMonthlyExpenses,
+  getYearlyExpenses,
 } from '../db/database';
 import {
-    calculateMonthlyTotal,
-    EXPENSE_CATEGORIES,
-    ExpenseCategory,
-    groupByCategory,
-    PAYMENT_METHODS,
-    PaymentMethod,
-    validateAmountInput,
+  calculateMonthlyTotal,
+  EXPENSE_CATEGORIES,
+  groupByCategory,
+  PAYMENT_METHODS,
 } from '../features/finance/financeUtils';
+import { RootStackParamList } from '../types/navigation';
 import { formatIDR } from '../utils/currency';
 
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -58,57 +59,95 @@ function formatMonth(yearMonth: string): string {
 }
 
 export default function FinanceScreen() {
-  const navigation = useNavigation();
-  const [currentMonth, setCurrentMonth] = useState(getYearMonth(new Date()));
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const now = new Date();
+  const [currentMonth, setCurrentMonth] = useState(getYearMonth(now));
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [expenses, setExpenses] = useState<ExpenseEntryRow[]>([]);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<ExpenseCategory>('Food');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
-  const [error, setError] = useState('');
+  const [yearlyExpenses, setYearlyExpenses] = useState<ExpenseEntryRow[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadExpenses = useCallback(async () => {
-    const rows = await getMonthlyExpenses(currentMonth);
-    setExpenses(rows);
-  }, [currentMonth]);
+  // Filters
+  const [filterCategory, setFilterCategory] = useState<string>('All');
+  const [filterPayment, setFilterPayment] = useState<string>('All');
 
+  // Load monthly expenses
+  useEffect(() => {
+    let isCurrent = true;
+    (async () => {
+      const rows = await getMonthlyExpenses(currentMonth);
+      if (isCurrent) setExpenses(rows);
+    })();
+    return () => { isCurrent = false; };
+  }, [currentMonth, refreshKey]);
+
+  // Load yearly expenses
+  useEffect(() => {
+    let isCurrent = true;
+    (async () => {
+      const rows = await getYearlyExpenses(currentYear);
+      if (isCurrent) setYearlyExpenses(rows);
+    })();
+    return () => { isCurrent = false; };
+  }, [currentYear, refreshKey]);
+
+  // Reload on focus
   useFocusEffect(
     useCallback(() => {
-      loadExpenses();
-    }, [loadExpenses])
+      setRefreshKey(k => k + 1);
+    }, [])
   );
 
   const navigateMonth = (direction: -1 | 1) => {
     const [y, m] = currentMonth.split('-').map(Number);
     const d = new Date(y, m - 1 + direction, 1);
     setCurrentMonth(getYearMonth(d));
+    setCurrentYear(d.getFullYear());
   };
 
-  const handleAdd = async () => {
-    if (!description.trim()) {
-      setError('Enter a description');
-      return;
-    }
-    const amt = validateAmountInput(amount);
-    if (amt === null) {
-      setError('Enter a valid amount (whole number)');
-      return;
-    }
-    setError('');
-    const today = new Date().toISOString().split('T')[0];
-    await addExpense(description.trim(), amt, category, today, paymentMethod);
-    setDescription('');
-    setAmount('');
-    await loadExpenses();
+  const navigateYear = (direction: -1 | 1) => {
+    setCurrentYear(prev => prev + direction);
   };
 
-  const handleDelete = async (id: number) => {
-    await deleteExpense(id);
-    await loadExpenses();
+  const confirmDelete = (id: number, desc: string) => {
+    Alert.alert(
+      'Delete Transaction',
+      `Are you sure you want to delete "${desc}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteExpense(id);
+            setRefreshKey(k => k + 1);
+          },
+        },
+      ]
+    );
   };
 
+  // Computed values
   const monthlyTotal = calculateMonthlyTotal(expenses);
   const categoryBreakdown = groupByCategory(expenses);
+  const yearlyTotal = calculateMonthlyTotal(yearlyExpenses);
+
+  const yearlyMonthlyData = useMemo(() => {
+    const data: Record<number, number> = {};
+    for (const e of yearlyExpenses) {
+      const month = parseInt(e.date.split('-')[1], 10);
+      data[month] = (data[month] || 0) + e.amount;
+    }
+    return data;
+  }, [yearlyExpenses]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(e => {
+      if (filterCategory !== 'All' && e.category !== filterCategory) return false;
+      if (filterPayment !== 'All' && e.payment_method !== filterPayment) return false;
+      return true;
+    });
+  }, [expenses, filterCategory, filterPayment]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -116,7 +155,7 @@ export default function FinanceScreen() {
         {/* Header with Back */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backArrow}>←</Text>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Finance</Text>
         </View>
@@ -124,23 +163,31 @@ export default function FinanceScreen() {
         {/* Month Navigator */}
         <View style={styles.monthNav}>
           <TouchableOpacity onPress={() => navigateMonth(-1)}>
-            <Text style={styles.navArrow}>‹</Text>
+            <Ionicons name="chevron-back" size={28} color="#FFB74D" />
           </TouchableOpacity>
           <Text style={styles.monthText}>{formatMonth(currentMonth)}</Text>
           <TouchableOpacity onPress={() => navigateMonth(1)}>
-            <Text style={styles.navArrow}>›</Text>
+            <Ionicons name="chevron-forward" size={28} color="#FFB74D" />
           </TouchableOpacity>
         </View>
 
-        {/* Monthly Summary */}
-        <View style={styles.totalCard}>
-          <Text style={styles.totalLabel}>Total Spent</Text>
-          <Text style={styles.totalValue}>
-            {formatIDR(monthlyTotal)}
-          </Text>
+        {/* Metrics */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Monthly</Text>
+            <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+              {formatIDR(monthlyTotal)}
+            </Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Yearly</Text>
+            <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+              {formatIDR(yearlyTotal)}
+            </Text>
+          </View>
         </View>
 
-        {/* Expense Chart */}
+        {/* Category Breakdown */}
         {Object.keys(categoryBreakdown).length > 0 && (
           <View style={styles.chartContainer}>
             <Text style={styles.sectionTitle}>Spending Breakdown</Text>
@@ -152,124 +199,148 @@ export default function FinanceScreen() {
           </View>
         )}
 
-        {/* Add Expense */}
-        <View style={styles.formContainer}>
-          <Text style={styles.sectionTitle}>Add Expense</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Description"
-            placeholderTextColor="#666"
-            value={description}
-            onChangeText={text => {
-              setDescription(text);
-              setError('');
-            }}
-          />
-
-          <View style={styles.rowInputs}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Amount (IDR)"
-              placeholderTextColor="#666"
-              value={amount}
-              onChangeText={text => {
-                setAmount(text);
-                setError('');
-              }}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-              <Text style={styles.addButtonText}>+</Text>
+        {/* Yearly Bar Chart */}
+        <View style={styles.chartContainer}>
+          <View style={styles.yearNav}>
+            <TouchableOpacity onPress={() => navigateYear(-1)}>
+              <Ionicons name="chevron-back" size={22} color="#FFB74D" />
+            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>{currentYear} Overview</Text>
+            <TouchableOpacity onPress={() => navigateYear(1)}>
+              <Ionicons name="chevron-forward" size={22} color="#FFB74D" />
             </TouchableOpacity>
           </View>
-
-          {/* Category Picker */}
-          <Text style={styles.pickerLabel}>Category</Text>
-          <View style={styles.chipPicker}>
-            {EXPENSE_CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.chip,
-                  category === cat && styles.chipActive,
-                ]}
-                onPress={() => setCategory(cat)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    category === cat && styles.chipTextActive,
-                  ]}
-                >
-                  {CATEGORY_EMOJIS[cat]} {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Payment Method Picker */}
-          <Text style={styles.pickerLabel}>Payment Method</Text>
-          <View style={styles.chipPicker}>
-            {PAYMENT_METHODS.map(method => (
-              <TouchableOpacity
-                key={method}
-                style={[
-                  styles.chip,
-                  paymentMethod === method && styles.chipActivePayment,
-                ]}
-                onPress={() => setPaymentMethod(method)}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    paymentMethod === method && styles.chipTextActive,
-                  ]}
-                >
-                  {PAYMENT_EMOJIS[method]} {method}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <YearlyBarChart
+            monthlyData={yearlyMonthlyData}
+            accentColor="#FFB74D"
+            year={currentYear}
+          />
         </View>
 
-        {/* Expense List */}
+        {/* Transaction Table */}
         <View style={styles.listContainer}>
           <Text style={styles.sectionTitle}>Transactions</Text>
-          {expenses.length === 0 ? (
+
+          {/* Filters */}
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
+              {['All', ...EXPENSE_CATEGORIES].map(cat => (
+                <TouchableOpacity
+                  key={`fc-${cat}`}
+                  style={[
+                    styles.filterChip,
+                    filterCategory === cat && styles.filterChipActive,
+                  ]}
+                  onPress={() => setFilterCategory(cat)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      filterCategory === cat && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {cat === 'All' ? '🏷️ All' : `${CATEGORY_EMOJIS[cat]} ${cat}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <View style={styles.filterSpacer} />
+
+              {['All', ...PAYMENT_METHODS].map(method => (
+                <TouchableOpacity
+                  key={`fp-${method}`}
+                  style={[
+                    styles.filterChip,
+                    filterPayment === method && styles.filterChipActivePayment,
+                  ]}
+                  onPress={() => setFilterPayment(method)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      filterPayment === method && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {method === 'All' ? '💳 All' : `${PAYMENT_EMOJIS[method]} ${method}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Table Header */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderText, { flex: 2 }]}>Description</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1 }]}>Category</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Amount</Text>
+            <Text style={[styles.tableHeaderText, { width: 36 }]} />
+          </View>
+
+          {/* Table Rows */}
+          {filteredExpenses.length === 0 ? (
             <View style={styles.emptyState}>
+              <Ionicons name="wallet-outline" size={32} color="#444" />
               <Text style={styles.emptyStateText}>
-                No expenses this month.
+                {expenses.length === 0 ? 'No expenses this month.' : 'No transactions match filters.'}
               </Text>
             </View>
           ) : (
-            expenses.map(entry => (
-              <View key={entry.id} style={styles.entryCard}>
-                <View style={styles.entryIcon}>
-                  <Text>{CATEGORY_EMOJIS[entry.category] || '📦'}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.entryDesc}>{entry.description}</Text>
-                  <Text style={styles.entryMeta}>
-                    {entry.date} · {entry.category} · {PAYMENT_EMOJIS[entry.payment_method] || ''} {entry.payment_method}
+            filteredExpenses.map((entry, idx) => (
+              <View
+                key={entry.id}
+                style={[styles.tableRow, idx % 2 === 0 && styles.tableRowAlt]}
+              >
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.rowDesc} numberOfLines={1}>{entry.description}</Text>
+                  <Text style={styles.rowMeta}>
+                    {entry.date} · {PAYMENT_EMOJIS[entry.payment_method]} {entry.payment_method}
                   </Text>
                 </View>
-                <Text style={styles.entryAmount}>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={styles.rowCategory}>
+                    {CATEGORY_EMOJIS[entry.category] || '📦'}
+                  </Text>
+                  <Text style={styles.rowCategoryText}>{entry.category}</Text>
+                </View>
+                <Text style={[styles.rowAmount, { flex: 1 }]} numberOfLines={1}>
                   {formatIDR(entry.amount)}
                 </Text>
                 <TouchableOpacity
                   style={styles.deleteButton}
-                  onPress={() => handleDelete(entry.id)}
+                  onPress={() => confirmDelete(entry.id, entry.description)}
                 >
-                  <Text style={styles.deleteButtonText}>✕</Text>
+                  <Ionicons name="close" size={14} color="#CF6679" />
                 </TouchableOpacity>
               </View>
             ))
           )}
+
+          {filteredExpenses.length > 0 && (
+            <View style={styles.tableFooter}>
+              <Text style={styles.tableFooterText}>
+                {filteredExpenses.length} transaction{filteredExpenses.length !== 1 ? 's' : ''}
+                {filterCategory !== 'All' || filterPayment !== 'All' ? ' (filtered)' : ''}
+              </Text>
+            </View>
+          )}
         </View>
+
+        {/* Bottom spacing for FAB */}
+        <View style={{ height: 80 }} />
       </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddExpense')}
+      >
+        <Ionicons name="add" size={28} color="#000" />
+      </TouchableOpacity>
+
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -298,14 +369,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  backArrow: {
-    fontSize: 20,
-    color: '#fff',
-  },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#fff',
   },
   monthNav: {
     flexDirection: 'row',
@@ -314,190 +381,194 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 24,
   },
-  navArrow: {
-    fontSize: 32,
-    color: '#FFB74D',
-    fontWeight: 'bold',
-    paddingHorizontal: 12,
-  },
   monthText: {
     fontSize: 18,
     color: '#fff',
     fontWeight: '600',
   },
-  totalCard: {
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 24,
+  },
+  metricCard: {
+    flex: 1,
+    padding: 16,
     backgroundColor: '#1e1e1e',
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#333',
     alignItems: 'center',
   },
-  totalLabel: {
-    fontSize: 14,
+  metricLabel: {
+    fontSize: 12,
     color: '#888',
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 4,
   },
-  totalValue: {
-    fontSize: 36,
+  metricValue: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFB74D',
   },
   chartContainer: {
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#1e1e1e',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#333',
   },
-  formContainer: {
-    padding: 24,
-    paddingBottom: 8,
+  yearNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#e0e0e0',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  input: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 14,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#333',
-    fontSize: 15,
-    marginBottom: 8,
+  listContainer: {
+    padding: 16,
+    paddingTop: 0,
   },
-  rowInputs: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
+  filterRow: {
+    marginBottom: 12,
   },
-  addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: '#FFB74D',
-    alignItems: 'center',
-    justifyContent: 'center',
+  filterScroll: {
+    gap: 6,
   },
-  addButtonText: {
-    fontSize: 24,
-    color: '#000',
-  },
-  pickerLabel: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 8,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  chipPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: '#3a3a3a',
   },
-  chipActive: {
+  filterChipActive: {
     backgroundColor: '#FFB74D',
     borderColor: '#FFB74D',
   },
-  chipActivePayment: {
+  filterChipActivePayment: {
     backgroundColor: '#BB86FC',
     borderColor: '#BB86FC',
   },
-  chipText: {
-    fontSize: 13,
-    color: '#ccc',
+  filterChipText: {
+    fontSize: 11,
+    color: '#aaa',
   },
-  chipTextActive: {
+  filterChipTextActive: {
     color: '#000',
     fontWeight: '600',
   },
-  errorText: {
-    color: '#CF6679',
-    fontSize: 13,
-    marginBottom: 8,
-    marginLeft: 4,
+  filterSpacer: {
+    width: 1,
+    backgroundColor: '#333',
+    marginHorizontal: 4,
   },
-  listContainer: {
-    padding: 24,
-    paddingTop: 0,
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  tableHeaderText: {
+    fontSize: 11,
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   emptyState: {
-    padding: 24,
+    padding: 32,
     backgroundColor: '#1e1e1e',
-    borderRadius: 16,
+    borderRadius: 12,
     alignItems: 'center',
     borderStyle: 'dashed',
     borderWidth: 1,
     borderColor: '#333',
+    gap: 8,
   },
   emptyStateText: {
     color: '#666',
   },
-  entryCard: {
+  tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e1e1e',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#333',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e1e1e',
   },
-  entryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2c2c2c',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  tableRowAlt: {
+    backgroundColor: '#161616',
+    borderRadius: 6,
   },
-  entryDesc: {
-    fontSize: 16,
-    color: '#ffffff',
+  rowDesc: {
+    fontSize: 14,
+    color: '#fff',
     fontWeight: '500',
   },
-  entryMeta: {
-    fontSize: 12,
-    color: '#888',
+  rowMeta: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
-  entryAmount: {
-    fontSize: 14,
+  rowCategory: {
+    fontSize: 16,
+  },
+  rowCategoryText: {
+    fontSize: 10,
+    color: '#888',
+    marginTop: 2,
+  },
+  rowAmount: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFB74D',
-    marginRight: 12,
+    textAlign: 'right',
   },
   deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#333',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2a2a2a',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
-  deleteButtonText: {
-    color: '#CF6679',
-    fontSize: 14,
-    fontWeight: 'bold',
+  tableFooter: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  tableFooterText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFB74D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#FFB74D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
 });

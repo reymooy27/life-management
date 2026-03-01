@@ -3,4 +3,7 @@ export type RootStackParamList = {
   Food: undefined;
   Exercise: undefined;
   Money: undefined;
+  AddFood: undefined;
+  AddExercise: undefined;
+  AddExpense: undefined;
 };

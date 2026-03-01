@@ -1,31 +1,27 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-  FlatList,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addFoodEntry, deleteFoodEntry, FoodEntryRow, getFoodEntries } from '../db/database';
-import { FoodItem, searchFoods } from '../features/food/calorieData';
-import { calculateDailyCalories, validateCalorieInput } from '../features/food/calorieUtils';
+import { deleteFoodEntry, FoodEntryRow, getFoodEntries } from '../db/database';
+import { calculateDailyCalories } from '../features/food/calorieUtils';
+import { RootStackParamList } from '../types/navigation';
 
 export default function FoodScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [entries, setEntries] = useState<FoodEntryRow[]>([]);
-  const [newFoodName, setNewFoodName] = useState('');
-  const [newCalories, setNewCalories] = useState('');
-  const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
-  const [calorieError, setCalorieError] = useState('');
 
   const loadEntries = useCallback(async () => {
     const rows = await getFoodEntries(selectedDate);
@@ -38,41 +34,6 @@ export default function FoodScreen() {
     }, [loadEntries])
   );
 
-  const handleSearchChange = (text: string) => {
-    setNewFoodName(text);
-    if (text.trim().length > 0) {
-      setSearchResults(searchFoods(text));
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const selectFood = (food: FoodItem) => {
-    setNewFoodName(food.name);
-    setNewCalories(food.caloriesPerServing.toString());
-    setSearchResults([]);
-    setCalorieError('');
-  };
-
-  const handleAddFood = async () => {
-    if (!newFoodName.trim()) return;
-    const cal = validateCalorieInput(newCalories);
-    if (cal === null) {
-      setCalorieError('Enter a valid calorie count (positive integer)');
-      return;
-    }
-    setCalorieError('');
-    const time = new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    await addFoodEntry(newFoodName.trim(), cal, selectedDate, time);
-    setNewFoodName('');
-    setNewCalories('');
-    setSearchResults([]);
-    await loadEntries();
-  };
-
   const handleDelete = async (id: number) => {
     await deleteFoodEntry(id);
     await loadEntries();
@@ -83,19 +44,19 @@ export default function FoodScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        {/* Header with Back */}
+        {/* Header */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backArrow}>←</Text>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Food Log</Text>
         </View>
 
         {/* Daily Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Today's Intake</Text>
+          <Ionicons name="flame-outline" size={24} color="#BB86FC" />
           <Text style={styles.summaryValue}>{dailyTotal}</Text>
-          <Text style={styles.summaryUnit}>calories</Text>
+          <Text style={styles.summaryUnit}>cal today</Text>
         </View>
 
         {/* Calendar */}
@@ -110,11 +71,11 @@ export default function FoodScreen() {
               calendarBackground: '#1e1e1e',
               textSectionTitleColor: '#b6c1cd',
               selectedDayBackgroundColor: '#BB86FC',
-              selectedDayTextColor: '#ffffff',
+              selectedDayTextColor: '#000',
               todayTextColor: '#BB86FC',
               dayTextColor: '#d9e1e8',
               textDisabledColor: '#2d4150',
-              monthTextColor: '#ffffff',
+              monthTextColor: '#fff',
               arrowColor: '#BB86FC',
               textMonthFontWeight: 'bold',
               textDayFontSize: 16,
@@ -124,72 +85,25 @@ export default function FoodScreen() {
           />
         </View>
 
-        {/* Input Section */}
+        {/* Entry List */}
         <View style={styles.entriesContainer}>
           <Text style={styles.sectionTitle}>
-            Meals for {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}
+            Meals for{' '}
+            {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}
           </Text>
 
-          {/* Search Input */}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, { flex: 2 }]}
-              placeholder="Search food..."
-              placeholderTextColor="#666"
-              value={newFoodName}
-              onChangeText={handleSearchChange}
-            />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Calories"
-              placeholderTextColor="#666"
-              value={newCalories}
-              onChangeText={text => {
-                setNewCalories(text);
-                setCalorieError('');
-              }}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAddFood}>
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-          {calorieError ? (
-            <Text style={styles.errorText}>{calorieError}</Text>
-          ) : null}
-
-          {/* Search Results Dropdown */}
-          {searchResults.length > 0 && (
-            <View style={styles.searchDropdown}>
-              <FlatList
-                data={searchResults}
-                keyExtractor={item => item.name}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.searchItem}
-                    onPress={() => selectFood(item)}
-                  >
-                    <Text style={styles.searchItemName}>{item.name}</Text>
-                    <Text style={styles.searchItemCal}>
-                      {item.caloriesPerServing} cal · {item.servingSize}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-
-          {/* Entry List */}
           {entries.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No meals logged yet.</Text>
+              <Ionicons name="restaurant-outline" size={32} color="#444" />
+              <Text style={styles.emptyStateText}>
+                No meals logged yet.
+              </Text>
             </View>
           ) : (
             entries.map(entry => (
               <View key={entry.id} style={styles.entryCard}>
                 <View style={styles.entryIcon}>
-                  <Text>🍽️</Text>
+                  <Ionicons name="restaurant" size={18} color="#BB86FC" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.entryName}>{entry.name}</Text>
@@ -201,13 +115,22 @@ export default function FoodScreen() {
                   style={styles.deleteButton}
                   onPress={() => handleDelete(entry.id)}
                 >
-                  <Text style={styles.deleteButtonText}>✕</Text>
+                  <Ionicons name="close" size={16} color="#CF6679" />
                 </TouchableOpacity>
               </View>
             ))
           )}
         </View>
       </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddFood')}
+      >
+        <Ionicons name="add" size={28} color="#000" />
+      </TouchableOpacity>
+
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -236,34 +159,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  backArrow: {
-    fontSize: 20,
-    color: '#fff',
-  },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#fff',
   },
   summaryCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 24,
+    padding: 20,
     backgroundColor: '#1e1e1e',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#333',
     alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
   summaryValue: {
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#BB86FC',
   },
@@ -287,70 +202,15 @@ const styles = StyleSheet.create({
     color: '#e0e0e0',
     marginBottom: 16,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 14,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#333',
-    fontSize: 15,
-  },
-  addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: '#BB86FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    fontSize: 24,
-    color: '#000',
-  },
-  errorText: {
-    color: '#CF6679',
-    fontSize: 13,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  searchDropdown: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#444',
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  searchItem: {
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  searchItemName: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  searchItemCal: {
-    color: '#BB86FC',
-    fontSize: 13,
-    marginTop: 2,
-  },
   emptyState: {
-    padding: 24,
+    padding: 32,
     backgroundColor: '#1e1e1e',
     borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 16,
     borderStyle: 'dashed',
     borderWidth: 1,
     borderColor: '#333',
+    gap: 8,
   },
   emptyStateText: {
     color: '#666',
@@ -376,7 +236,7 @@ const styles = StyleSheet.create({
   },
   entryName: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#fff',
     fontWeight: '500',
   },
   entryTime: {
@@ -391,9 +251,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteButtonText: {
-    color: '#CF6679',
-    fontSize: 14,
-    fontWeight: 'bold',
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#BB86FC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#BB86FC',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
 });

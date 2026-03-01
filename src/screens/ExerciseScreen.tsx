@@ -1,34 +1,30 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    addExerciseEntry,
     deleteExerciseEntry,
     ExerciseEntryRow,
     getExerciseEntries,
 } from '../db/database';
-import { validateCalorieInput } from '../features/food/calorieUtils';
+import { RootStackParamList } from '../types/navigation';
 
 export default function ExerciseScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [entries, setEntries] = useState<ExerciseEntryRow[]>([]);
-  const [exerciseName, setExerciseName] = useState('');
-  const [duration, setDuration] = useState('');
-  const [caloriesBurned, setCaloriesBurned] = useState('');
-  const [error, setError] = useState('');
 
   const loadEntries = useCallback(async () => {
     const rows = await getExerciseEntries(selectedDate);
@@ -41,33 +37,6 @@ export default function ExerciseScreen() {
     }, [loadEntries])
   );
 
-  const handleAdd = async () => {
-    if (!exerciseName.trim()) {
-      setError('Enter an exercise name');
-      return;
-    }
-    const dur = validateCalorieInput(duration);
-    if (dur === null || dur <= 0) {
-      setError('Enter a valid duration in minutes');
-      return;
-    }
-    const cal = validateCalorieInput(caloriesBurned);
-    if (cal === null) {
-      setError('Enter a valid calorie count');
-      return;
-    }
-    setError('');
-    const time = new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    await addExerciseEntry(exerciseName.trim(), dur, cal, selectedDate, time);
-    setExerciseName('');
-    setDuration('');
-    setCaloriesBurned('');
-    await loadEntries();
-  };
-
   const handleDelete = async (id: number) => {
     await deleteExerciseEntry(id);
     await loadEntries();
@@ -79,10 +48,10 @@ export default function ExerciseScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        {/* Header with Back */}
+        {/* Header */}
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backArrow}>←</Text>
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Exercise Log</Text>
         </View>
@@ -90,12 +59,12 @@ export default function ExerciseScreen() {
         {/* Daily Summary */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Burned</Text>
+            <Ionicons name="flame-outline" size={20} color="#03DAC6" />
             <Text style={styles.summaryValue}>{totalBurned}</Text>
             <Text style={styles.summaryUnit}>cal</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Duration</Text>
+            <Ionicons name="timer-outline" size={20} color="#03DAC6" />
             <Text style={styles.summaryValue}>{totalMinutes}</Text>
             <Text style={styles.summaryUnit}>min</Text>
           </View>
@@ -113,11 +82,11 @@ export default function ExerciseScreen() {
               calendarBackground: '#1e1e1e',
               textSectionTitleColor: '#b6c1cd',
               selectedDayBackgroundColor: '#03DAC6',
-              selectedDayTextColor: '#000000',
+              selectedDayTextColor: '#000',
               todayTextColor: '#03DAC6',
               dayTextColor: '#d9e1e8',
               textDisabledColor: '#2d4150',
-              monthTextColor: '#ffffff',
+              monthTextColor: '#fff',
               arrowColor: '#03DAC6',
               textMonthFontWeight: 'bold',
               textDayFontSize: 16,
@@ -127,55 +96,16 @@ export default function ExerciseScreen() {
           />
         </View>
 
-        {/* Input Section */}
+        {/* Entry List */}
         <View style={styles.entriesContainer}>
           <Text style={styles.sectionTitle}>
             Exercises for{' '}
             {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Exercise name (e.g., Running)"
-            placeholderTextColor="#666"
-            value={exerciseName}
-            onChangeText={text => {
-              setExerciseName(text);
-              setError('');
-            }}
-          />
-          <View style={styles.rowInputs}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Min"
-              placeholderTextColor="#666"
-              value={duration}
-              onChangeText={text => {
-                setDuration(text);
-                setError('');
-              }}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Calories burned"
-              placeholderTextColor="#666"
-              value={caloriesBurned}
-              onChangeText={text => {
-                setCaloriesBurned(text);
-                setError('');
-              }}
-              keyboardType="numeric"
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-              <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          {/* Entry List */}
           {entries.length === 0 ? (
             <View style={styles.emptyState}>
+              <Ionicons name="barbell-outline" size={32} color="#444" />
               <Text style={styles.emptyStateText}>
                 No exercises logged yet.
               </Text>
@@ -184,7 +114,7 @@ export default function ExerciseScreen() {
             entries.map(entry => (
               <View key={entry.id} style={styles.entryCard}>
                 <View style={styles.entryIcon}>
-                  <Text>🏃</Text>
+                  <Ionicons name="fitness" size={18} color="#03DAC6" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.entryName}>{entry.name}</Text>
@@ -197,13 +127,22 @@ export default function ExerciseScreen() {
                   style={styles.deleteButton}
                   onPress={() => handleDelete(entry.id)}
                 >
-                  <Text style={styles.deleteButtonText}>✕</Text>
+                  <Ionicons name="close" size={16} color="#CF6679" />
                 </TouchableOpacity>
               </View>
             ))
           )}
         </View>
       </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddExercise')}
+      >
+        <Ionicons name="add" size={28} color="#000" />
+      </TouchableOpacity>
+
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -232,14 +171,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  backArrow: {
-    fontSize: 20,
-    color: '#fff',
-  },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: '#fff',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -249,22 +184,18 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#1e1e1e',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#333',
     alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#888',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
   summaryValue: {
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#03DAC6',
   },
@@ -288,48 +219,15 @@ const styles = StyleSheet.create({
     color: '#e0e0e0',
     marginBottom: 16,
   },
-  input: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 14,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#333',
-    fontSize: 15,
-    marginBottom: 8,
-  },
-  rowInputs: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: '#03DAC6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    fontSize: 24,
-    color: '#000',
-  },
-  errorText: {
-    color: '#CF6679',
-    fontSize: 13,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
   emptyState: {
-    padding: 24,
+    padding: 32,
     backgroundColor: '#1e1e1e',
     borderRadius: 16,
     alignItems: 'center',
-    marginTop: 8,
     borderStyle: 'dashed',
     borderWidth: 1,
     borderColor: '#333',
+    gap: 8,
   },
   emptyStateText: {
     color: '#666',
@@ -355,7 +253,7 @@ const styles = StyleSheet.create({
   },
   entryName: {
     fontSize: 16,
-    color: '#ffffff',
+    color: '#fff',
     fontWeight: '500',
   },
   entryMeta: {
@@ -370,9 +268,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteButtonText: {
-    color: '#CF6679',
-    fontSize: 14,
-    fontWeight: 'bold',
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#03DAC6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#03DAC6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
 });

@@ -11,6 +11,7 @@ You are an expert React Native developer. You are building "LifeFlow," a life ma
 5. **Currency**: Use IDR (Indonesian Rupiah) for all currency values.
 6. **Testing**: Write unit tests for all components and functions.
 7. **Reusable Components**: Use reusable components for common UI elements.
+8. **UI Library**: Use expo vector icons for all icons
 
 ## Specific Tasks
 - [x] Scaffold the project using Expo and TypeScript.
@@ -26,6 +27,17 @@ You are an expert React Native developer. You are building "LifeFlow," a life ma
 - [x] HomeScreen: make the scroll can go back to the first menu when user scroll to the end
 - [x] HomeScreen: when swipe right, it will go to their spesific screen
 - [x] HomeScreen: on each menu show a little dashboar for the summary
+- [x] Finance: show the spending breakdown on the dashboard
+- [x] Finance: add bar chart that show the yearly spending, its up down, not to the side,
+- [x] Finance: also add date input so user can add transaction on spesific date
+- [x] Finance: add metrics for the spending for one year too
+- [x] Finance: add metrics for the spending for one year too
+- [x] Finance: for the transaction list make it in table view, add filter for category, payment method, and date range
+- [x] Finance: for the delete button on the list, add a confirmation dialog
+- [x] For all the input section in all the features, make a new seperate new screen for it, and add a button on the bottom right corner to add new input
+- [x] Add a quick button to input for each features on the dashboard
+
+
 
 
 

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +22,7 @@ import {
   getFoodEntries,
   getMonthlyExpenses,
 } from '../db/database';
-import { calculateMonthlyTotal } from '../features/finance/financeUtils';
+import { calculateMonthlyTotal, groupByCategory } from '../features/finance/financeUtils';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
 import { formatIDR } from '../utils/currency';
@@ -36,9 +37,10 @@ interface FeaturePage {
   key: string;
   title: string;
   subtitle: string;
-  emoji: string;
+  icon: keyof typeof Ionicons.glyphMap;
   accentColor: string;
   route: keyof RootStackParamList;
+  addRoute: keyof RootStackParamList;
 }
 
 const FEATURES: FeaturePage[] = [
@@ -46,25 +48,28 @@ const FEATURES: FeaturePage[] = [
     key: 'food',
     title: 'Food Tracker',
     subtitle: 'Log meals, search foods,\nand track your daily calories',
-    emoji: '🥗',
+    icon: 'restaurant',
     accentColor: '#BB86FC',
     route: 'Food',
+    addRoute: 'AddFood',
   },
   {
     key: 'exercise',
     title: 'Exercise',
     subtitle: 'Track workouts, duration,\nand calories burned',
-    emoji: '🏃',
+    icon: 'fitness',
     accentColor: '#03DAC6',
     route: 'Exercise',
+    addRoute: 'AddExercise',
   },
   {
     key: 'finance',
     title: 'Finance',
     subtitle: 'Monitor expenses, categories,\nand monthly spending',
-    emoji: '💰',
+    icon: 'wallet',
     accentColor: '#FFB74D',
     route: 'Money',
+    addRoute: 'AddExpense',
   },
 ];
 
@@ -143,6 +148,13 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.dashLabel}>{mealCount === 1 ? 'meal' : 'meals'} logged</Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.quickAddBtn, { backgroundColor: '#BB86FC' }]}
+              onPress={() => navigation.navigate('AddFood')}
+            >
+              <Ionicons name="add" size={18} color="#000" />
+              <Text style={styles.quickAddText}>Quick Add</Text>
+            </TouchableOpacity>
           </View>
         );
       }
@@ -162,12 +174,25 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.dashLabel}>min today</Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.quickAddBtn, { backgroundColor: '#03DAC6' }]}
+              onPress={() => navigation.navigate('AddExercise')}
+            >
+              <Ionicons name="add" size={18} color="#000" />
+              <Text style={styles.quickAddText}>Quick Add</Text>
+            </TouchableOpacity>
           </View>
         );
       }
       case 'finance': {
         const monthTotal = calculateMonthlyTotal(monthlyExpenses);
-        const txCount = monthlyExpenses.length;
+        const catBreakdown = groupByCategory(monthlyExpenses);
+        const topCategories = Object.entries(catBreakdown)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3);
+        const EMOJIS: Record<string, string> = {
+          Food: '🍔', Transport: '🚗', Bills: '📄', Entertainment: '🎬', Other: '📦',
+        };
         return (
           <View style={styles.dashboardCard}>
             <View style={styles.dashRow}>
@@ -177,12 +202,24 @@ export default function HomeScreen({ navigation }: Props) {
                 </Text>
                 <Text style={styles.dashLabel}>this month</Text>
               </View>
-              <View style={styles.dashDivider} />
-              <View style={styles.dashItem}>
-                <Text style={[styles.dashValue, { color: '#FFB74D' }]}>{txCount}</Text>
-                <Text style={styles.dashLabel}>transactions</Text>
-              </View>
             </View>
+            {topCategories.length > 0 && (
+              <View style={styles.dashBreakdown}>
+                {topCategories.map(([cat, amt]) => (
+                  <View key={cat} style={styles.dashBreakdownItem}>
+                    <Text style={styles.dashBreakdownEmoji}>{EMOJIS[cat] || '📦'}</Text>
+                    <Text style={styles.dashBreakdownText}>{formatIDR(amt)}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.quickAddBtn, { backgroundColor: '#FFB74D' }]}
+              onPress={() => navigation.navigate('AddExpense')}
+            >
+              <Ionicons name="add" size={18} color="#000" />
+              <Text style={styles.quickAddText}>Quick Add</Text>
+            </TouchableOpacity>
           </View>
         );
       }
@@ -203,7 +240,7 @@ export default function HomeScreen({ navigation }: Props) {
               { borderColor: item.accentColor },
             ]}
           >
-            <Text style={styles.emoji}>{item.emoji}</Text>
+            <Ionicons name={item.icon} size={40} color={item.accentColor} />
           </View>
 
           <Text style={styles.pageTitle}>{item.title}</Text>
@@ -216,7 +253,8 @@ export default function HomeScreen({ navigation }: Props) {
             style={[styles.openButton, { backgroundColor: item.accentColor }]}
             onPress={() => navigation.navigate(item.route)}
           >
-            <Text style={styles.openButtonText}>Open →</Text>
+            <Ionicons name="arrow-forward" size={18} color="#000" />
+            <Text style={styles.openButtonText}>Open</Text>
           </TouchableOpacity>
         </View>
 
@@ -368,9 +406,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
-  emoji: {
-    fontSize: 40,
-  },
   pageTitle: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -419,7 +454,30 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: '#333',
   },
+  dashBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  dashBreakdownItem: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  dashBreakdownEmoji: {
+    fontSize: 16,
+  },
+  dashBreakdownText: {
+    fontSize: 10,
+    color: '#FFB74D',
+    fontWeight: '600',
+  },
   openButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 36,
     paddingVertical: 14,
     borderRadius: 30,
@@ -442,5 +500,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#555',
     letterSpacing: 1,
+  },
+  quickAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  quickAddText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000',
   },
 });
