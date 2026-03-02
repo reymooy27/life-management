@@ -31,11 +31,11 @@ You are an expert React Native developer. You are building "LifeFlow," a life ma
 - [x] Finance: add bar chart that show the yearly spending, its up down, not to the side,
 - [x] Finance: also add date input so user can add transaction on spesific date
 - [x] Finance: add metrics for the spending for one year too
-- [x] Finance: add metrics for the spending for one year too
 - [x] Finance: for the transaction list make it in table view, add filter for category, payment method, and date range
 - [x] Finance: for the delete button on the list, add a confirmation dialog
 - [x] For all the input section in all the features, make a new seperate new screen for it, and add a button on the bottom right corner to add new input
 - [x] Add a quick button to input for each features on the dashboard
+- [ ]
 
 
 

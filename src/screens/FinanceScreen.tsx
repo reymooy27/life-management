@@ -341,10 +341,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-    borderWidth: 1,
-    borderColor: 'red',
-    margin: 0,
-    padding: 0
   },
   monthNav: {
     flexDirection: 'row',
