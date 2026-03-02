@@ -82,8 +82,11 @@ const MIDDLE_START_INDEX = Math.floor(LOOP_MULTIPLIER / 2) * FEATURES.length;
 
 export default function HomeScreen({ navigation }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [listHeight, setListHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  // Height: debounce onLayout — wait for height to stabilize before committing
+  const heightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [stableHeight, setStableHeight] = useState(0);
 
   // Simple swipe tracking (no PanResponder — avoids conflicts with FlatList scroll)
   const touchStart = useRef({ x: 0, y: 0, time: 0 });
@@ -93,6 +96,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
   const [monthlyExpenses, setMonthlyExpenses] = useState<ExpenseEntryRow[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+
+  // Gate viewability: ignore events for first 600ms after mount
+  const mountTime = useRef(Date.now());
 
   const loadDashboardData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -116,6 +122,8 @@ export default function HomeScreen({ navigation }: Props) {
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      // Ignore viewability events during initial mount/positioning
+      if (Date.now() - mountTime.current < 600) return;
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
         setActiveIndex(viewableItems[0].index % FEATURES.length);
       }
@@ -127,7 +135,12 @@ export default function HomeScreen({ navigation }: Props) {
   }).current;
 
   const onListLayout = (e: LayoutChangeEvent) => {
-    setListHeight(e.nativeEvent.layout.height);
+    const h = Math.ceil(e.nativeEvent.layout.height);
+    // Debounce: only commit height after layout stops changing (200ms)
+    if (heightTimer.current) clearTimeout(heightTimer.current);
+    heightTimer.current = setTimeout(() => {
+      setStableHeight(h);
+    }, 200);
   };
 
   const getDashboard = (featureKey: string) => {
@@ -148,13 +161,6 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.dashLabel}>{mealCount === 1 ? 'meal' : 'meals'} logged</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={[styles.quickAddBtn, { backgroundColor: '#BB86FC' }]}
-              onPress={() => navigation.navigate('AddFood')}
-            >
-              <Ionicons name="add" size={18} color="#000" />
-              <Text style={styles.quickAddText}>Quick Add</Text>
-            </TouchableOpacity>
           </View>
         );
       }
@@ -174,13 +180,6 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.dashLabel}>min today</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={[styles.quickAddBtn, { backgroundColor: '#03DAC6' }]}
-              onPress={() => navigation.navigate('AddExercise')}
-            >
-              <Ionicons name="add" size={18} color="#000" />
-              <Text style={styles.quickAddText}>Quick Add</Text>
-            </TouchableOpacity>
           </View>
         );
       }
@@ -213,13 +212,6 @@ export default function HomeScreen({ navigation }: Props) {
                 ))}
               </View>
             )}
-            <TouchableOpacity
-              style={[styles.quickAddBtn, { backgroundColor: '#FFB74D' }]}
-              onPress={() => navigation.navigate('AddExpense')}
-            >
-              <Ionicons name="add" size={18} color="#000" />
-              <Text style={styles.quickAddText}>Quick Add</Text>
-            </TouchableOpacity>
           </View>
         );
       }
@@ -230,7 +222,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: FeaturePage }) => {
     const baseKey = item.key.split('_')[0];
-    const itemHeight = listHeight || 500;
+    const itemHeight = stableHeight || 500;
     return (
       <View style={[styles.page, { height: itemHeight }]}>
         <View style={styles.pageContent}>
@@ -240,7 +232,7 @@ export default function HomeScreen({ navigation }: Props) {
               { borderColor: item.accentColor },
             ]}
           >
-            <Ionicons name={item.icon} size={40} color={item.accentColor} />
+            <Ionicons name={item.icon} size={32} color={item.accentColor} />
           </View>
 
           <Text style={styles.pageTitle}>{item.title}</Text>
@@ -249,47 +241,34 @@ export default function HomeScreen({ navigation }: Props) {
           {/* Mini Dashboard */}
           {getDashboard(baseKey)}
 
-          <TouchableOpacity
-            style={[styles.openButton, { backgroundColor: item.accentColor }]}
-            onPress={() => navigation.navigate(item.route)}
-          >
-            <Ionicons name="arrow-forward" size={18} color="#000" />
-            <Text style={styles.openButtonText}>Open</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.openButton, { backgroundColor: item.accentColor }]}
+              onPress={() => navigation.navigate(item.route)}
+            >
+              <Ionicons name="arrow-forward" size={16} color="#000" />
+              <Text style={styles.openButtonText}>Open</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickAddRound, { backgroundColor: item.accentColor }]}
+              onPress={() => navigation.navigate(item.addRoute)}
+            >
+              <Ionicons name="add" size={22} color="#000" />
+            </TouchableOpacity>
+          </View>
 
-        {/* Swipe hint */}
-        <View style={styles.swipeHint}>
-          <Text style={styles.swipeHintText}>↑↓ scroll  ←  swipe to open  →  swipe back</Text>
+          {/* Dot indicators + swipe hint */}
         </View>
+          <View style={styles.pageFooter}>
+            <Text style={styles.hintText}>↑↓ scroll · swipe → to open</Text>
+          </View>
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Fixed Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>LifeManager</Text>
-        <Text style={styles.subtitle}>Master your day, one step at a time.</Text>
-      </View>
 
-      {/* Dot Indicators */}
-      <View style={styles.dots}>
-        {FEATURES.map((f, i) => (
-          <View
-            key={f.key}
-            style={[
-              styles.dot,
-              {
-                backgroundColor:
-                  i === activeIndex ? FEATURES[activeIndex].accentColor : '#444',
-                width: i === activeIndex ? 24 : 8,
-              },
-            ]}
-          />
-        ))}
-      </View>
 
       {/* Vertical Paging FlatList */}
       <View
@@ -321,23 +300,22 @@ export default function HomeScreen({ navigation }: Props) {
           }
         }}
       >
-        {listHeight > 0 && (
+        {stableHeight > 0 && (
           <FlatList
             ref={flatListRef}
             data={LOOPED_DATA}
             renderItem={renderItem}
             keyExtractor={item => item.key}
-            pagingEnabled
             showsVerticalScrollIndicator={false}
             snapToAlignment="start"
-            snapToInterval={listHeight}
+            snapToInterval={stableHeight}
             decelerationRate="fast"
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             initialScrollIndex={MIDDLE_START_INDEX}
             getItemLayout={(_, index) => ({
-              length: listHeight,
-              offset: listHeight * index,
+              length: stableHeight,
+              offset: stableHeight * index,
               index,
             })}
             extraData={dataLoaded}
@@ -371,60 +349,50 @@ const styles = StyleSheet.create({
     color: '#a0a0a0',
     marginTop: 4,
   },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-  },
   page: {
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    overflow: 'hidden',
   },
   pageContent: {
     alignItems: 'center',
     width: '100%',
   },
   emojiCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#1e1e1e',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    marginBottom: 20,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 6,
+    marginBottom: 4,
     textAlign: 'center',
   },
   pageSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#a0a0a0',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   dashboardCard: {
     backgroundColor: '#1e1e1e',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
     width: '100%',
     borderWidth: 1,
     borderColor: '#333',
@@ -439,7 +407,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dashValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   dashLabel: {
@@ -474,45 +442,43 @@ const styles = StyleSheet.create({
     color: '#FFB74D',
     fontWeight: '600',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   openButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 36,
-    paddingVertical: 14,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 24,
+    elevation: 4,
   },
   openButtonText: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     color: '#000',
   },
-  swipeHint: {
-    position: 'absolute',
-    bottom: 20,
-  },
-  swipeHintText: {
-    fontSize: 11,
-    color: '#555',
-    letterSpacing: 1,
-  },
-  quickAddBtn: {
-    flexDirection: 'row',
+  quickAddRound: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginTop: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    elevation: 4,
   },
-  quickAddText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000',
+  pageFooter: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  hintText: {
+    fontSize: 11,
+    color: '#555',
+    letterSpacing: 0.5,
   },
 });
