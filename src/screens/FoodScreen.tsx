@@ -4,14 +4,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { deleteFoodEntry, FoodEntryRow, getFoodEntries } from '../db/database';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
@@ -42,15 +41,8 @@ export default function FoodScreen() {
   const dailyTotal = calculateDailyCalories(entries);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Food Log</Text>
-        </View>
 
         {/* Daily Summary */}
         <View style={styles.summaryCard}>
@@ -132,7 +124,7 @@ export default function FoodScreen() {
       </TouchableOpacity>
 
       <StatusBar style="light" />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -140,29 +132,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e1e1e',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   summaryCard: {
     marginHorizontal: 16,

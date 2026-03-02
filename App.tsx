@@ -12,6 +12,15 @@ import { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const HEADER_STYLE = {
+  headerStyle: {
+    backgroundColor: '#121212',
+   },
+  headerTintColor: '#fff',
+  headerShadowVisible: false,
+  headerTitleStyle: { fontWeight: '600' as const, fontSize: 16},
+};
+
 export default function App() {
   return (
     <NavigationContainer>
@@ -26,32 +35,68 @@ export default function App() {
         <Stack.Screen
           name="Food"
           component={FoodScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Food Log',
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
         />
         <Stack.Screen
           name="Exercise"
           component={ExerciseScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Exercise Log',
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
         />
         <Stack.Screen
           name="Money"
           component={FinanceScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Finance',
+            gestureEnabled: true,
+            animation: 'slide_from_right',
+          }}
         />
         <Stack.Screen
           name="AddFood"
           component={AddFoodScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Add Food',
+            gestureEnabled: true,
+            animation: 'slide_from_bottom',
+          }}
         />
         <Stack.Screen
           name="AddExercise"
           component={AddExerciseScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Add Exercise',
+            gestureEnabled: true,
+            animation: 'slide_from_bottom',
+          }}
         />
         <Stack.Screen
           name="AddExpense"
           component={AddExpenseScreen}
-          options={{ gestureEnabled: true, animation: 'slide_from_right' }}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Add Expense',
+            gestureEnabled: true,
+            animation: 'slide_from_bottom',
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

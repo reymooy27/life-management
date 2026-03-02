@@ -4,13 +4,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { addExerciseEntry } from '../db/database';
 import { validateCalorieInput } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
@@ -48,14 +47,7 @@ export default function AddExerciseScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Add Exercise</Text>
-      </View>
-
+    <View style={styles.container}>
       <View style={styles.form}>
         <Text style={styles.label}>Exercise Name</Text>
         <TextInput
@@ -104,7 +96,7 @@ export default function AddExerciseScreen() {
       </View>
 
       <StatusBar style="light" />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -112,29 +104,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e1e1e',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   form: {
     padding: 24,

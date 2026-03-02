@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import ExpenseBarChart from '../components/ExpenseBarChart';
 import YearlyBarChart from '../components/YearlyBarChart';
 import {
@@ -150,16 +149,8 @@ export default function FinanceScreen() {
   }, [expenses, filterCategory, filterPayment]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        {/* Header with Back */}
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Finance</Text>
-        </View>
-
         {/* Month Navigator */}
         <View style={styles.monthNav}>
           <TouchableOpacity onPress={() => navigateMonth(-1)}>
@@ -342,7 +333,7 @@ export default function FinanceScreen() {
       </TouchableOpacity>
 
       <StatusBar style="light" />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -350,29 +341,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e1e1e',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
     borderWidth: 1,
-    borderColor: '#333',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    borderColor: 'red',
+    margin: 0,
+    padding: 0
   },
   monthNav: {
     flexDirection: 'row',
