@@ -310,7 +310,12 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-
+      {/* Settings Button */}
+      <View style={styles.settingsHeaderContainer}>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+          <Ionicons name="settings-outline" size={28} color="#666" />
+        </TouchableOpacity>
+      </View>
 
       {/* Vertical Paging FlatList */}
       <View
@@ -376,6 +381,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+  },
+  settingsHeaderContainer: {
+    position: 'absolute',
+    top: 50,
+    right: 24,
+    zIndex: 10,
   },
   header: {
     paddingHorizontal: 24,

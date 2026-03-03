@@ -8,6 +8,7 @@ import ExerciseScreen from './src/screens/ExerciseScreen';
 import FinanceScreen from './src/screens/FinanceScreen';
 import FoodScreen from './src/screens/FoodScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -102,6 +103,18 @@ export default function App() {
             gestureEnabled: true,
             animationDuration: 300,
             animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Settings',
+            gestureEnabled: true,
+            animationDuration: 300,
+            animation: 'slide_from_right',
           }}
         />
       </Stack.Navigator>

@@ -43,6 +43,15 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       date TEXT NOT NULL,
       payment_method TEXT NOT NULL DEFAULT 'Cash'
     );
+
+    CREATE TABLE IF NOT EXISTS user_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      weight_kg REAL,
+      height_cm REAL,
+      birthdate TEXT,
+      gender TEXT,
+      activity_level TEXT
+    );
   `);
 
   // Migration: add payment_method column if it doesn't exist
@@ -181,5 +190,41 @@ export async function getYearlyExpenses(year: number): Promise<ExpenseEntryRow[]
   return await database.getAllAsync<ExpenseEntryRow>(
     "SELECT * FROM expense_entries WHERE date LIKE ? || '%' ORDER BY date DESC, id DESC",
     [prefix]
+  );
+}
+
+// ── User Settings CRUD ──
+
+export interface UserSettings {
+  id: number;
+  weight_kg: number | null;
+  height_cm: number | null;
+  birthdate: string | null;
+  gender: string | null;
+  activity_level: string | null;
+}
+
+export async function getUserSettings(): Promise<UserSettings | null> {
+  const database = await getDatabase();
+  const result = await database.getFirstAsync<UserSettings>(
+    'SELECT * FROM user_settings WHERE id = 1'
+  );
+  return result;
+}
+
+export async function saveUserSettings(
+  settings: Omit<UserSettings, 'id'>
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO user_settings (id, weight_kg, height_cm, birthdate, gender, activity_level)
+     VALUES (1, ?, ?, ?, ?, ?)`,
+    [
+      settings.weight_kg ?? null,
+      settings.height_cm ?? null,
+      settings.birthdate ?? null,
+      settings.gender ?? null,
+      settings.activity_level ?? null,
+    ]
   );
 }

@@ -6,4 +6,5 @@ export type RootStackParamList = {
   AddFood: undefined;
   AddExercise: undefined;
   AddExpense: undefined;
+  Settings: undefined;
 };
