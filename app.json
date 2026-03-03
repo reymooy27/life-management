@@ -1,8 +1,8 @@
 {
   "expo": {
-    "scheme": "life-management",
-    "name": "life-management",
-    "slug": "life-management",
+    "scheme": "life-flow",
+    "name": "LifeFlow",
+    "slug": "life-flow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +22,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.reymooy.lifemanagement",
+      "package": "com.reymooy.lifeflow",
       "enableProguardInReleaseBuilds": true,
       "enableShrinkResourcesInReleaseBuilds": true
     },
