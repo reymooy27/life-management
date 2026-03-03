@@ -20,9 +20,9 @@ import { RootStackParamList } from '../types/navigation';
 
 export default function ExerciseScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const TODAY = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState<string>(TODAY);
+  const [currentMonth, setCurrentMonth] = useState<string>(TODAY.substring(0, 7));
   const [entries, setEntries] = useState<ExerciseEntryRow[]>([]);
 
   const loadEntries = useCallback(async () => {
@@ -65,6 +65,15 @@ export default function ExerciseScreen() {
         {/* Calendar */}
         <View style={styles.calendarContainer}>
           <Calendar
+            maxDate={TODAY}
+            onMonthChange={(month: DateData) => setCurrentMonth(month.dateString.substring(0, 7))}
+            renderArrow={(direction: string) => {
+              if (direction === 'left') return <Ionicons name="chevron-back" size={24} color="#03DAC6" />;
+              if (direction === 'right' && currentMonth < TODAY.substring(0, 7)) {
+                return <Ionicons name="chevron-forward" size={24} color="#03DAC6" />;
+              }
+              return <View style={{ width: 24 }} />;
+            }}
             onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
             markedDates={{
               [selectedDate]: { selected: true, selectedColor: '#03DAC6' },

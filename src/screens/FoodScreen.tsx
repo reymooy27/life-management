@@ -26,9 +26,9 @@ import { RootStackParamList } from '../types/navigation';
 
 export default function FoodScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const TODAY = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState<string>(TODAY);
+  const [currentMonth, setCurrentMonth] = useState<string>(TODAY.substring(0, 7));
   const [entries, setEntries] = useState<FoodEntryRow[]>([]);
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -133,6 +133,15 @@ export default function FoodScreen() {
         {/* Calendar */}
         <View style={styles.calendarContainer}>
           <Calendar
+            maxDate={TODAY}
+            onMonthChange={(month: DateData) => setCurrentMonth(month.dateString.substring(0, 7))}
+            renderArrow={(direction: string) => {
+              if (direction === 'left') return <Ionicons name="chevron-back" size={24} color="#BB86FC" />;
+              if (direction === 'right' && currentMonth < TODAY.substring(0, 7)) {
+                return <Ionicons name="chevron-forward" size={24} color="#BB86FC" />;
+              }
+              return <View style={{ width: 24 }} />;
+            }}
             onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
             markedDates={{
               [selectedDate]: { selected: true, selectedColor: '#BB86FC' },

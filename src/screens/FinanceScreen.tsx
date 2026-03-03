@@ -4,26 +4,26 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import ExpenseBarChart from '../components/ExpenseBarChart';
 import YearlyBarChart from '../components/YearlyBarChart';
 import {
-  deleteExpense,
-  ExpenseEntryRow,
-  getMonthlyExpenses,
-  getYearlyExpenses,
+    deleteExpense,
+    ExpenseEntryRow,
+    getMonthlyExpenses,
+    getYearlyExpenses,
 } from '../db/database';
 import {
-  calculateMonthlyTotal,
-  EXPENSE_CATEGORIES,
-  groupByCategory,
-  PAYMENT_METHODS,
+    calculateMonthlyTotal,
+    EXPENSE_CATEGORIES,
+    groupByCategory,
+    PAYMENT_METHODS,
 } from '../features/finance/financeUtils';
 import { RootStackParamList } from '../types/navigation';
 import { formatIDR } from '../utils/currency';
@@ -157,9 +157,13 @@ export default function FinanceScreen() {
             <Ionicons name="chevron-back" size={28} color="#FFB74D" />
           </TouchableOpacity>
           <Text style={styles.monthText}>{formatMonth(currentMonth)}</Text>
-          <TouchableOpacity onPress={() => navigateMonth(1)}>
-            <Ionicons name="chevron-forward" size={28} color="#FFB74D" />
-          </TouchableOpacity>
+          {currentMonth < getYearMonth(new Date()) ? (
+            <TouchableOpacity onPress={() => navigateMonth(1)}>
+              <Ionicons name="chevron-forward" size={28} color="#FFB74D" />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 28 }} />
+          )}
         </View>
 
         {/* Metrics */}
@@ -197,9 +201,13 @@ export default function FinanceScreen() {
               <Ionicons name="chevron-back" size={22} color="#FFB74D" />
             </TouchableOpacity>
             <Text style={styles.sectionTitle}>{currentYear} Overview</Text>
-            <TouchableOpacity onPress={() => navigateYear(1)}>
-              <Ionicons name="chevron-forward" size={22} color="#FFB74D" />
-            </TouchableOpacity>
+            {currentYear < new Date().getFullYear() ? (
+              <TouchableOpacity onPress={() => navigateYear(1)}>
+                <Ionicons name="chevron-forward" size={22} color="#FFB74D" />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 22 }} />
+            )}
           </View>
           <YearlyBarChart
             monthlyData={yearlyMonthlyData}

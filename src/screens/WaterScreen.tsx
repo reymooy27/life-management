@@ -4,19 +4,19 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {
-    UserSettings,
-    WaterEntryRow,
-    deleteWaterEntry,
-    getUserSettings,
-    getWaterEntries,
+  UserSettings,
+  WaterEntryRow,
+  deleteWaterEntry,
+  getUserSettings,
+  getWaterEntries,
 } from '../db/database';
 import { RootStackParamList } from '../types/navigation';
 
