@@ -91,6 +91,10 @@ export default function HomeScreen({ navigation }: Props) {
   // Simple swipe tracking (no PanResponder — avoids conflicts with FlatList scroll)
   const touchStart = useRef({ x: 0, y: 0, time: 0 });
 
+  // Manual one-page-at-a-time snapping
+  const currentPageRef = useRef(MIDDLE_START_INDEX);
+  const dragStartPageRef = useRef(MIDDLE_START_INDEX);
+
   // Dashboard data
   const [foodEntries, setFoodEntries] = useState<FoodEntryRow[]>([]);
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
@@ -131,7 +135,7 @@ export default function HomeScreen({ navigation }: Props) {
   ).current;
 
   const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
+    viewAreaCoveragePercentThreshold: 80,
   }).current;
 
   const onListLayout = (e: LayoutChangeEvent) => {
@@ -142,6 +146,44 @@ export default function HomeScreen({ navigation }: Props) {
       setStableHeight(h);
     }, 200);
   };
+
+  const onScrollBeginDrag = useCallback(() => {
+    dragStartPageRef.current = currentPageRef.current;
+  }, []);
+
+  const onScrollEndDrag = useCallback((e: any) => {
+    if (stableHeight <= 0) return;
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const velocity = e.nativeEvent.velocity?.y ?? 0;
+    const startPage = dragStartPageRef.current;
+    const currentOffset = startPage * stableHeight;
+    const delta = offsetY - currentOffset;
+
+    let targetPage = startPage;
+    // Need to drag at least 30% of a page OR flick with real velocity to change page
+    if (delta > stableHeight * 0.3 || velocity > 0.8) {
+      targetPage = startPage + 1;
+    } else if (delta < -stableHeight * 0.3 || velocity < -0.8) {
+      targetPage = startPage - 1;
+    }
+
+    // Clamp to valid range
+    targetPage = Math.max(0, Math.min(targetPage, LOOPED_DATA.length - 1));
+    currentPageRef.current = targetPage;
+    flatListRef.current?.scrollToIndex({
+      index: targetPage,
+      animated: true,
+    });
+  }, [stableHeight]);
+
+  const onMomentumScrollEnd = useCallback(() => {
+    // Correct final position after any remaining momentum
+    if (stableHeight <= 0) return;
+    flatListRef.current?.scrollToIndex({
+      index: currentPageRef.current,
+      animated: false,
+    });
+  }, [stableHeight]);
 
   const getDashboard = (featureKey: string) => {
     switch (featureKey) {
@@ -307,9 +349,11 @@ export default function HomeScreen({ navigation }: Props) {
             renderItem={renderItem}
             keyExtractor={item => item.key}
             showsVerticalScrollIndicator={false}
-            snapToAlignment="start"
-            snapToInterval={stableHeight}
-            decelerationRate="fast"
+            decelerationRate={0.993}
+            disableIntervalMomentum={true}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onScrollEndDrag={onScrollEndDrag}
+            onMomentumScrollEnd={onMomentumScrollEnd}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             initialScrollIndex={MIDDLE_START_INDEX}
