@@ -16,6 +16,7 @@ You are an expert React Native developer. You are building "LifeFlow," a life ma
 10. **Feature Consistency** this app will have more features in the future, make sure the style, structure is consistent in each feature
 
 ## Guidelines
+1. For executing command line make sure to use Powershell command
 1. Always use the best practices used by the community
 2. use a good, community tested library for a feature or from expo, instead of code it from scratch
 3. always check if its possible to use expo feature, instead of code it from scratch
@@ -25,7 +26,12 @@ You are an expert React Native developer. You are building "LifeFlow," a life ma
 
 ## Commit Message Format
 ```
-[Feature/Fix]: [Description]
+example:
+feat: [Description]
+fix: [Description]
+style: [Description]
+refactor: [Description]
+test: [Description]
 ```
 
 ## Boundaries
