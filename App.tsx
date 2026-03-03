@@ -40,6 +40,7 @@ export default function App() {
             headerShown: true,
             title: 'Food Log',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_right',
           }}
         />
@@ -51,6 +52,7 @@ export default function App() {
             headerShown: true,
             title: 'Exercise Log',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_right',
           }}
         />
@@ -62,6 +64,7 @@ export default function App() {
             headerShown: true,
             title: 'Finance',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_right',
           }}
         />
@@ -73,6 +76,7 @@ export default function App() {
             headerShown: true,
             title: 'Add Food',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_bottom',
           }}
         />
@@ -84,6 +88,7 @@ export default function App() {
             headerShown: true,
             title: 'Add Exercise',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_bottom',
           }}
         />
@@ -95,6 +100,7 @@ export default function App() {
             headerShown: true,
             title: 'Add Expense',
             gestureEnabled: true,
+            animationDuration: 300,
             animation: 'slide_from_bottom',
           }}
         />
