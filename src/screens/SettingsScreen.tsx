@@ -5,24 +5,24 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserSettings, saveUserSettings } from '../db/database';
 import {
-  ACTIVITY_LEVELS,
-  calculateAge,
-  calculateBMR,
-  calculateTDEE,
-  validateMeasurement,
+    ACTIVITY_LEVELS,
+    calculateAge,
+    calculateBMR,
+    calculateTDEE,
+    validateMeasurement,
 } from '../features/settings/settingsUtils';
 import { RootStackParamList } from '../types/navigation';
 
@@ -34,6 +34,7 @@ export default function SettingsScreen() {
   const [birthdate, setBirthdate] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | null>(null);
   const [activityLevel, setActivityLevel] = useState('');
+  const [waterGoal, setWaterGoal] = useState<number | null>(null);
 
   const [isCalendarVisible, setCalendarVisible] = useState(false);
   const [isActivityModalVisible, setActivityModalVisible] = useState(false);
@@ -59,6 +60,7 @@ export default function SettingsScreen() {
         setBirthdate(settings.birthdate || '');
         setGender((settings.gender as 'Male' | 'Female') || null);
         setActivityLevel(settings.activity_level || '');
+        setWaterGoal(settings.water_goal_ml || null);
       }
     } catch (error) {
       console.error('Failed to load settings', error);
@@ -88,6 +90,7 @@ export default function SettingsScreen() {
         birthdate: birthdate || null,
         gender: gender || null,
         activity_level: activityLevel || null,
+        water_goal_ml: waterGoal,
       });
 
       navigation.goBack();

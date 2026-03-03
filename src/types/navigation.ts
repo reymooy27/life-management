@@ -7,4 +7,6 @@ export type RootStackParamList = {
   AddExercise: undefined;
   AddExpense: undefined;
   Settings: undefined;
+  Water: undefined;
+  AddWater: undefined;
 };

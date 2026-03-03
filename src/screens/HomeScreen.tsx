@@ -4,23 +4,27 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  Dimensions,
-  FlatList,
-  LayoutChangeEvent,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewToken,
+    Dimensions,
+    FlatList,
+    LayoutChangeEvent,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    ViewToken,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ExerciseEntryRow,
-  ExpenseEntryRow,
-  FoodEntryRow,
-  getExerciseEntries,
-  getFoodEntries,
-  getMonthlyExpenses,
+    ExerciseEntryRow,
+    ExpenseEntryRow,
+    FoodEntryRow,
+    UserSettings,
+    WaterEntryRow,
+    getExerciseEntries,
+    getFoodEntries,
+    getMonthlyExpenses,
+    getUserSettings,
+    getWaterEntries,
 } from '../db/database';
 import { calculateMonthlyTotal, groupByCategory } from '../features/finance/financeUtils';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
@@ -71,6 +75,15 @@ const FEATURES: FeaturePage[] = [
     route: 'Money',
     addRoute: 'AddExpense',
   },
+  {
+    key: 'water',
+    title: 'Water Tracker',
+    subtitle: 'Stay hydrated,\ntrack daily water intake',
+    icon: 'water',
+    accentColor: '#2196F3',
+    route: 'Water',
+    addRoute: 'AddWater',
+  },
 ];
 
 // Repeat data for infinite loop scrolling
@@ -99,6 +112,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [foodEntries, setFoodEntries] = useState<FoodEntryRow[]>([]);
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
   const [monthlyExpenses, setMonthlyExpenses] = useState<ExpenseEntryRow[]>([]);
+  const [waterEntries, setWaterEntries] = useState<WaterEntryRow[]>([]);
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // Gate viewability: ignore events for first 600ms after mount
@@ -107,14 +122,18 @@ export default function HomeScreen({ navigation }: Props) {
   const loadDashboardData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0];
     const yearMonth = today.substring(0, 7);
-    const [food, exercise, expenses] = await Promise.all([
+    const [food, exercise, expenses, water, settings] = await Promise.all([
       getFoodEntries(today),
       getExerciseEntries(today),
       getMonthlyExpenses(yearMonth),
+      getWaterEntries(today),
+      getUserSettings(),
     ]);
     setFoodEntries(food);
     setExerciseEntries(exercise);
     setMonthlyExpenses(expenses);
+    setWaterEntries(water);
+    setUserSettings(settings);
     setDataLoaded(true);
   }, []);
 
@@ -254,6 +273,26 @@ export default function HomeScreen({ navigation }: Props) {
                 ))}
               </View>
             )}
+          </View>
+        );
+      }
+      case 'water': {
+        const totalWaterIdr = waterEntries.reduce((s, e) => s + e.amount_ml, 0);
+        const goal = userSettings?.water_goal_ml || 2500;
+        const progress = Math.min((totalWaterIdr / goal) * 100, 100).toFixed(0);
+        return (
+          <View style={styles.dashboardCard}>
+            <View style={styles.dashRow}>
+              <View style={styles.dashItem}>
+                <Text style={[styles.dashValue, { color: '#2196F3' }]}>{totalWaterIdr}</Text>
+                <Text style={styles.dashLabel}>ml consumed</Text>
+              </View>
+              <View style={styles.dashDivider} />
+              <View style={styles.dashItem}>
+                <Text style={[styles.dashValue, { color: '#2196F3' }]}>{progress}%</Text>
+                <Text style={styles.dashLabel}>of {goal}ml goal</Text>
+              </View>
+            </View>
           </View>
         );
       }

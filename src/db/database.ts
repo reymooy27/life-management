@@ -61,29 +61,67 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE
     );
-
     CREATE TABLE IF NOT EXISTS payment_methods (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE
     );
+
+    CREATE TABLE IF NOT EXISTS water_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      amount_ml INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS water_presets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amount_ml INTEGER NOT NULL
+    );
   `);
 
   // Seed default expense categories if empty
-  const categoriesCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM expense_categories');
-  if (categoriesCount?.count === 0) {
-    const defaultCategories = ['Food', 'Transport', 'Bills', 'Entertainment', 'Other'];
-    for (const cat of defaultCategories) {
-      await database.runAsync('INSERT INTO expense_categories (name) VALUES (?)', [cat]);
+  try {
+    const categoriesCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM expense_categories');
+    if (categoriesCount?.count === 0) {
+      const defaultCategories = ['Food', 'Transport', 'Bills', 'Entertainment', 'Other'];
+      for (const cat of defaultCategories) {
+        await database.runAsync('INSERT INTO expense_categories (name) VALUES (?)', [cat]);
+      }
     }
+  } catch (e) {
+    console.error('Error seeding default categories', e);
   }
 
   // Seed default payment methods if empty
-  const paymentMethodsCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM payment_methods');
-  if (paymentMethodsCount?.count === 0) {
-    const defaultMethods = ['Cash', 'Debit', 'Credit'];
-    for (const method of defaultMethods) {
-      await database.runAsync('INSERT INTO payment_methods (name) VALUES (?)', [method]);
+  try {
+    const paymentMethodsCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM payment_methods');
+    if (paymentMethodsCount?.count === 0) {
+      const defaultMethods = ['Cash', 'Debit', 'Credit'];
+      for (const method of defaultMethods) {
+        await database.runAsync('INSERT INTO payment_methods (name) VALUES (?)', [method]);
+      }
     }
+  } catch (e) {
+    console.error('Error seeding default payment methods', e);
+  }
+
+  // Seed default water presets if empty
+  try {
+    const waterPresetsCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM water_presets');
+    if (waterPresetsCount?.count === 0) {
+      const defaultPresets = [
+        { name: 'Glass', amount_ml: 250 },
+        { name: 'Bottle', amount_ml: 500 },
+        { name: 'Large Bottle', amount_ml: 750 },
+      ];
+      for (const preset of defaultPresets) {
+        await database.runAsync('INSERT INTO water_presets (name, amount_ml) VALUES (?, ?)', [preset.name, preset.amount_ml]);
+      }
+    }
+  } catch (e) {
+    console.error('Error seeding water presets', e);
   }
 
   // Migration: add payment_method column if it doesn't exist
@@ -111,6 +149,15 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
     );
   } catch {
     // Columns already exist — ignore
+  }
+
+  // Migration: add water_goal_ml column if it doesn't exist
+  try {
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN water_goal_ml INTEGER NOT NULL DEFAULT 2500"
+    );
+  } catch {
+    // Column already exists — ignore
   }
 }
 
@@ -269,6 +316,7 @@ export interface UserSettings {
   birthdate: string | null;
   gender: string | null;
   activity_level: string | null;
+  water_goal_ml: number | null;
 }
 
 export async function getUserSettings(): Promise<UserSettings | null> {
@@ -284,14 +332,15 @@ export async function saveUserSettings(
 ): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
-    `INSERT OR REPLACE INTO user_settings (id, weight_kg, height_cm, birthdate, gender, activity_level)
-     VALUES (1, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO user_settings (id, weight_kg, height_cm, birthdate, gender, activity_level, water_goal_ml)
+     VALUES (1, ?, ?, ?, ?, ?, ?)`,
     [
       settings.weight_kg ?? null,
       settings.height_cm ?? null,
       settings.birthdate ?? null,
       settings.gender ?? null,
       settings.activity_level ?? null,
+      settings.water_goal_ml ?? 2500,
     ]
   );
 }
@@ -370,4 +419,68 @@ export async function deletePaymentMethod(name: string): Promise<void> {
     throw new Error('Cannot delete this payment method because it is being used in your expenses.');
   }
   await database.runAsync('DELETE FROM payment_methods WHERE name = ?', [name]);
+}
+
+// ── Water CRUD ──
+
+export interface WaterEntryRow {
+  id: number;
+  amount_ml: number;
+  name: string;
+  date: string;
+  time: string;
+}
+
+export async function addWaterEntry(
+  amountMl: number,
+  name: string,
+  date: string,
+  time: string
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT INTO water_entries (amount_ml, name, date, time) VALUES (?, ?, ?, ?)',
+    [amountMl, name, date, time]
+  );
+}
+
+export async function getWaterEntries(date: string): Promise<WaterEntryRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<WaterEntryRow>(
+    'SELECT * FROM water_entries WHERE date = ? ORDER BY id DESC',
+    [date]
+  );
+}
+
+export async function deleteWaterEntry(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('DELETE FROM water_entries WHERE id = ?', [id]);
+}
+
+// ── Water Presets CRUD ──
+
+export interface WaterPresetRow {
+  id: number;
+  name: string;
+  amount_ml: number;
+}
+
+export async function getWaterPresets(): Promise<WaterPresetRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<WaterPresetRow>(
+    'SELECT * FROM water_presets ORDER BY amount_ml ASC'
+  );
+}
+
+export async function addWaterPreset(name: string, amountMl: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT INTO water_presets (name, amount_ml) VALUES (?, ?)',
+    [name, amountMl]
+  );
+}
+
+export async function deleteWaterPreset(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('DELETE FROM water_presets WHERE id = ?', [id]);
 }
