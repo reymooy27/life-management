@@ -56,7 +56,35 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       gender TEXT,
       activity_level TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_methods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE
+    );
   `);
+
+  // Seed default expense categories if empty
+  const categoriesCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM expense_categories');
+  if (categoriesCount?.count === 0) {
+    const defaultCategories = ['Food', 'Transport', 'Bills', 'Entertainment', 'Other'];
+    for (const cat of defaultCategories) {
+      await database.runAsync('INSERT INTO expense_categories (name) VALUES (?)', [cat]);
+    }
+  }
+
+  // Seed default payment methods if empty
+  const paymentMethodsCount = await database.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM payment_methods');
+  if (paymentMethodsCount?.count === 0) {
+    const defaultMethods = ['Cash', 'Debit', 'Credit'];
+    for (const method of defaultMethods) {
+      await database.runAsync('INSERT INTO payment_methods (name) VALUES (?)', [method]);
+    }
+  }
 
   // Migration: add payment_method column if it doesn't exist
   try {
@@ -266,4 +294,80 @@ export async function saveUserSettings(
       settings.activity_level ?? null,
     ]
   );
+}
+
+// ── Custom Expense Categories CRUD ──
+
+export interface CustomCategoryRow {
+  id: number;
+  name: string;
+}
+
+export async function getExpenseCategories(): Promise<CustomCategoryRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<CustomCategoryRow>(
+    'SELECT * FROM expense_categories ORDER BY id ASC'
+  );
+}
+
+export async function addExpenseCategory(name: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('INSERT INTO expense_categories (name) VALUES (?)', [name]);
+}
+
+export async function updateExpenseCategory(oldName: string, newName: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('UPDATE expense_categories SET name = ? WHERE name = ?', [newName, oldName]);
+  // Cascade update expenses
+  await database.runAsync('UPDATE expense_entries SET category = ? WHERE category = ?', [newName, oldName]);
+}
+
+export async function deleteExpenseCategory(name: string): Promise<void> {
+  const database = await getDatabase();
+  const usageCount = await database.getFirstAsync<{count: number}>(
+    'SELECT COUNT(*) as count FROM expense_entries WHERE category = ?',
+    [name]
+  );
+  if ((usageCount?.count ?? 0) > 0) {
+    throw new Error('Cannot delete this category because it is being used in your expenses.');
+  }
+  await database.runAsync('DELETE FROM expense_categories WHERE name = ?', [name]);
+}
+
+// ── Custom Payment Methods CRUD ──
+
+export interface CustomPaymentMethodRow {
+  id: number;
+  name: string;
+}
+
+export async function getPaymentMethods(): Promise<CustomPaymentMethodRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<CustomPaymentMethodRow>(
+    'SELECT * FROM payment_methods ORDER BY id ASC'
+  );
+}
+
+export async function addPaymentMethod(name: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('INSERT INTO payment_methods (name) VALUES (?)', [name]);
+}
+
+export async function updatePaymentMethod(oldName: string, newName: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('UPDATE payment_methods SET name = ? WHERE name = ?', [newName, oldName]);
+  // Cascade update expenses
+  await database.runAsync('UPDATE expense_entries SET payment_method = ? WHERE payment_method = ?', [newName, oldName]);
+}
+
+export async function deletePaymentMethod(name: string): Promise<void> {
+  const database = await getDatabase();
+  const usageCount = await database.getFirstAsync<{count: number}>(
+    'SELECT COUNT(*) as count FROM expense_entries WHERE payment_method = ?',
+    [name]
+  );
+  if ((usageCount?.count ?? 0) > 0) {
+    throw new Error('Cannot delete this payment method because it is being used in your expenses.');
+  }
+  await database.runAsync('DELETE FROM payment_methods WHERE name = ?', [name]);
 }

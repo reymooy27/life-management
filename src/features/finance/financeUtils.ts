@@ -8,11 +8,11 @@ export const EXPENSE_CATEGORIES = [
   'Other',
 ] as const;
 
-export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+export type ExpenseCategory = string;
 
 export const PAYMENT_METHODS = ['Cash', 'Debit', 'Credit'] as const;
 
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export type PaymentMethod = string;
 
 /**
  * Sum total amount from an array of expense entries.

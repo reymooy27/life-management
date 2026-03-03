@@ -2,22 +2,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { addExpense } from '../db/database';
 import {
-  EXPENSE_CATEGORIES,
-  ExpenseCategory,
-  PAYMENT_METHODS,
-  PaymentMethod,
-  validateAmountInput,
+    addExpense,
+    addExpenseCategory,
+    addPaymentMethod,
+    CustomCategoryRow,
+    CustomPaymentMethodRow,
+    deleteExpenseCategory,
+    deletePaymentMethod,
+    getExpenseCategories,
+    getPaymentMethods,
+    updateExpenseCategory,
+    updatePaymentMethod,
+} from '../db/database';
+import {
+    EXPENSE_CATEGORIES,
+    ExpenseCategory,
+    PAYMENT_METHODS,
+    PaymentMethod,
+    validateAmountInput,
 } from '../features/finance/financeUtils';
 import { RootStackParamList } from '../types/navigation';
 
@@ -46,6 +60,131 @@ export default function AddExpenseScreen() {
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState('');
+
+  const [categories, setCategories] = useState<CustomCategoryRow[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<CustomPaymentMethodRow[]>([]);
+
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    try {
+      const cats = await getExpenseCategories();
+      const methods = await getPaymentMethods();
+      setCategories(cats);
+      setPaymentMethods(methods);
+
+      // Auto select first entry if current is not in list
+      if (cats.length > 0 && !cats.find(c => c.name === category)) {
+        setCategory(cats[0].name);
+      }
+      if (methods.length > 0 && !methods.find(m => m.name === paymentMethod)) {
+        setPaymentMethod(methods[0].name);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Modal State
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalType, setModalType] = useState<'add_category' | 'add_payment' | 'edit_category' | 'edit_payment'>('add_category');
+  const [modalInputValue, setModalInputValue] = useState('');
+  const [editingItem, setEditingItem] = useState<{name: string, id: number} | null>(null);
+
+  const handleOpenAddModal = (type: 'add_category' | 'add_payment') => {
+    setModalType(type);
+    setModalInputValue('');
+    setEditingItem(null);
+    setIsModalVisible(true);
+  };
+
+  const handleOpenEditModal = (type: 'edit_category' | 'edit_payment', item: {name: string, id: number}) => {
+    setModalType(type);
+    setModalInputValue(item.name);
+    setEditingItem(item);
+    setIsModalVisible(true);
+  };
+
+  const handleSaveModal = async () => {
+    const val = modalInputValue.trim();
+    if (!val) {
+      Alert.alert('Error', 'Name cannot be empty.');
+      return;
+    }
+
+    try {
+      if (modalType === 'add_category') {
+        if (categories.some(c => c.name.toLowerCase() === val.toLowerCase())) {
+          Alert.alert('Error', 'Category already exists.');
+          return;
+        }
+        await addExpenseCategory(val);
+        setCategory(val);
+      } else if (modalType === 'add_payment') {
+        if (paymentMethods.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+          Alert.alert('Error', 'Payment method already exists.');
+          return;
+        }
+        await addPaymentMethod(val);
+        setPaymentMethod(val);
+      } else if (modalType === 'edit_category' && editingItem) {
+        if (val !== editingItem.name) {
+          if (categories.some(c => c.name.toLowerCase() === val.toLowerCase())) {
+             Alert.alert('Error', 'Category name already exists.');
+             return;
+          }
+          await updateExpenseCategory(editingItem.name, val);
+          if (category === editingItem.name) setCategory(val);
+        }
+      } else if (modalType === 'edit_payment' && editingItem) {
+        if (val !== editingItem.name) {
+          if (paymentMethods.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+             Alert.alert('Error', 'Payment method name already exists.');
+             return;
+          }
+          await updatePaymentMethod(editingItem.name, val);
+          if (paymentMethod === editingItem.name) setPaymentMethod(val);
+        }
+      }
+      setIsModalVisible(false);
+      loadPreferences();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Something went wrong.');
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!editingItem) return;
+
+    Alert.alert(
+      'Delete Confirmation',
+      `Are you sure you want to delete "${editingItem.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (modalType === 'edit_category') {
+                await deleteExpenseCategory(editingItem.name);
+                if (category === editingItem.name) setCategory('Food');
+              } else if (modalType === 'edit_payment') {
+                await deletePaymentMethod(editingItem.name);
+                if (paymentMethod === editingItem.name) setPaymentMethod('Cash');
+              }
+              setIsModalVisible(false);
+              loadPreferences();
+            } catch (e: any) {
+              Alert.alert('Error', e.message || 'Cannot delete item.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleAdd = async () => {
     if (!description.trim()) {
@@ -138,38 +277,54 @@ export default function AddExpenseScreen() {
         {/* Category Picker */}
         <Text style={styles.label}>Category</Text>
         <View style={styles.chipPicker}>
-          {EXPENSE_CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <TouchableOpacity
-              key={cat}
-              style={[styles.chip, category === cat && styles.chipActive]}
-              onPress={() => setCategory(cat)}
+              key={cat.id}
+              style={[styles.chip, category === cat.name && styles.chipActive]}
+              onPress={() => setCategory(cat.name)}
+              onLongPress={() => handleOpenEditModal('edit_category', cat)}
             >
-              <Text style={[styles.chipText, category === cat && styles.chipTextActive]}>
-                {CATEGORY_EMOJIS[cat]} {cat}
+              <Text style={[styles.chipText, category === cat.name && styles.chipTextActive]}>
+                {CATEGORY_EMOJIS[cat.name] || '📦'} {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={styles.chipAdd}
+            onPress={() => handleOpenAddModal('add_category')}
+          >
+            <Ionicons name="add" size={16} color="#aaa" />
+            <Text style={styles.chipAddText}>New</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Payment Method */}
         <Text style={styles.label}>Payment Method</Text>
         <View style={styles.chipPicker}>
-          {PAYMENT_METHODS.map(method => (
+          {paymentMethods.map(method => (
             <TouchableOpacity
-              key={method}
-              style={[styles.chip, paymentMethod === method && styles.chipActivePayment]}
-              onPress={() => setPaymentMethod(method)}
+              key={method.id}
+              style={[styles.chip, paymentMethod === method.name && styles.chipActivePayment]}
+              onPress={() => setPaymentMethod(method.name)}
+              onLongPress={() => handleOpenEditModal('edit_payment', method)}
             >
               <Text
                 style={[
                   styles.chipText,
-                  paymentMethod === method && styles.chipTextActive,
+                  paymentMethod === method.name && styles.chipTextActive,
                 ]}
               >
-                {PAYMENT_EMOJIS[method]} {method}
+                {PAYMENT_EMOJIS[method.name] || '🏦'} {method.name}
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={styles.chipAdd}
+            onPress={() => handleOpenAddModal('add_payment')}
+          >
+            <Ionicons name="add" size={16} color="#aaa" />
+            <Text style={styles.chipAddText}>New</Text>
+          </TouchableOpacity>
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -179,6 +334,40 @@ export default function AddExpenseScreen() {
           <Text style={styles.submitButtonText}>Add Expense</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={isModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {modalType.startsWith('add') ? 'Add New' : 'Edit'} {modalType.includes('category') ? 'Category' : 'Payment Method'}
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              value={modalInputValue}
+              onChangeText={setModalInputValue}
+              placeholder="Enter name..."
+              placeholderTextColor="#666"
+              autoFocus
+            />
+
+            <View style={styles.modalActions}>
+              {modalType.startsWith('edit') && (
+                <TouchableOpacity style={styles.modalDeleteBtn} onPress={handleDeleteItem}>
+                  <Ionicons name="trash" size={20} color="#CF6679" />
+                </TouchableOpacity>
+              )}
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setIsModalVisible(false)}>
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveModal}>
+                <Text style={styles.modalBtnSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <StatusBar style="light" />
     </View>
@@ -280,5 +469,80 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#000',
+  },
+  chipAdd: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#444',
+    borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipAddText: {
+    fontSize: 13,
+    color: '#aaa',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalDeleteBtn: {
+    padding: 8,
+  },
+  modalBtnCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalBtnCancelText: {
+    color: '#ccc',
+    fontSize: 16,
+  },
+  modalBtnSave: {
+    backgroundColor: '#FFB74D',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  modalBtnSaveText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
