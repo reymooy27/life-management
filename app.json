@@ -1,5 +1,6 @@
 {
   "expo": {
+    "scheme": "life-management",
     "name": "life-management",
     "slug": "life-management",
     "version": "1.0.0",
@@ -21,13 +22,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.reymooy.lifemanagement"
+      "package": "com.reymooy.lifemanagement",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-sqlite"
-    ]
+    "plugins": ["expo-sqlite"]
   }
 }

@@ -36,6 +36,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# Android build outputs
-android/app/build/
-android/.gradle/
+# Native generated folders (created by expo prebuild)
+android/
+ios/
