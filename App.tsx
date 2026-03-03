@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as SplashScreen from 'expo-splash-screen';
 import React from 'react';
 import AddExerciseScreen from './src/screens/AddExerciseScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
@@ -10,6 +11,8 @@ import FoodScreen from './src/screens/FoodScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { RootStackParamList } from './src/types/navigation';
+
+SplashScreen.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -23,6 +26,11 @@ const HEADER_STYLE = {
 };
 
 export default function App() {
+  React.useEffect(() => {
+    // Hide the splash screen after the component mounts
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
