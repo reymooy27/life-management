@@ -4,15 +4,24 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { deleteFoodEntry, FoodEntryRow, getFoodEntries } from '../db/database';
-import { calculateDailyCalories } from '../features/food/calorieUtils';
+import {
+    deleteFoodEntry,
+    ExerciseEntryRow,
+    FoodEntryRow,
+    getExerciseEntries,
+    getFoodEntries,
+    getUserSettings,
+    UserSettings,
+} from '../db/database';
+import { calculateDailyCalories, calculateDailyMacros, calculateNetCalories } from '../features/food/calorieUtils';
+import { calculateAge, calculateBMR, calculateTDEE, validateMeasurement } from '../features/settings/settingsUtils';
 import { RootStackParamList } from '../types/navigation';
 
 export default function FoodScreen() {
@@ -21,10 +30,18 @@ export default function FoodScreen() {
     new Date().toISOString().split('T')[0]
   );
   const [entries, setEntries] = useState<FoodEntryRow[]>([]);
+  const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
 
   const loadEntries = useCallback(async () => {
-    const rows = await getFoodEntries(selectedDate);
-    setEntries(rows);
+    const [foodRows, exerciseRows, userSet] = await Promise.all([
+      getFoodEntries(selectedDate),
+      getExerciseEntries(selectedDate),
+      getUserSettings(),
+    ]);
+    setEntries(foodRows);
+    setExerciseEntries(exerciseRows);
+    setSettings(userSet);
   }, [selectedDate]);
 
   useFocusEffect(
@@ -39,16 +56,78 @@ export default function FoodScreen() {
   };
 
   const dailyTotal = calculateDailyCalories(entries);
+  const dailyMacros = calculateDailyMacros(entries);
+  const burnedTotal = exerciseEntries.reduce((sum, e) => sum + e.calories_burned, 0);
+
+  // Goal calculation
+  let goal = 2000; // Default goal
+  if (settings) {
+    const displayAge = settings.birthdate ? calculateAge(settings.birthdate) : 30;
+    const parsedWeight = validateMeasurement(settings.weight_kg?.toString() || '') || 70;
+    const parsedHeight = validateMeasurement(settings.height_cm?.toString() || '') || 170;
+    const gender = (settings.gender as 'Male' | 'Female') || 'Male';
+    const bmr = calculateBMR(parsedWeight, parsedHeight, displayAge, gender);
+    if (bmr > 0) {
+      goal = calculateTDEE(bmr, settings.activity_level || 'sedentary');
+    }
+  }
+
+  const remaining = goal - dailyTotal + burnedTotal;
+  const isOverGoal = remaining < 0;
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'Breakfast': return 'sunny';
+      case 'Lunch': return 'fast-food';
+      case 'Dinner': return 'restaurant';
+      default: return 'cafe';
+    }
+  };
 
   return (
     <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
 
-        {/* Daily Summary */}
-        <View style={styles.summaryCard}>
-          <Ionicons name="flame-outline" size={24} color="#BB86FC" />
-          <Text style={styles.summaryValue}>{dailyTotal}</Text>
-          <Text style={styles.summaryUnit}>cal today</Text>
+        {/* Dashboard Dashboard */}
+        <View style={styles.dashboardCard}>
+          <View style={styles.dashRow}>
+            <View style={styles.dashItem}>
+              <Text style={styles.dashValue}>{goal}</Text>
+              <Text style={styles.dashLabel}>Goal</Text>
+            </View>
+            <View style={styles.dashDivider} />
+            <View style={styles.dashItem}>
+              <Text style={[styles.dashValue, { color: '#BB86FC' }]}>{dailyTotal}</Text>
+              <Text style={styles.dashLabel}>Consumed</Text>
+            </View>
+            <View style={styles.dashDivider} />
+            <View style={styles.dashItem}>
+              <Text style={[styles.dashValue, { color: '#03DAC6' }]}>{burnedTotal}</Text>
+              <Text style={styles.dashLabel}>Burned</Text>
+            </View>
+            <View style={styles.dashDivider} />
+            <View style={styles.dashItem}>
+              <Text style={[styles.dashValue, { color: isOverGoal ? '#CF6679' : '#fff' }]}>
+                {Math.abs(remaining)}
+              </Text>
+              <Text style={styles.dashLabel}>{isOverGoal ? 'Over' : 'Left'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.macroRow}>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{dailyMacros.protein}g</Text>
+              <Text style={styles.macroLabel}>Protein</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{dailyMacros.carbs}g</Text>
+              <Text style={styles.macroLabel}>Carbs</Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text style={styles.macroValue}>{dailyMacros.fats}g</Text>
+              <Text style={styles.macroLabel}>Fats</Text>
+            </View>
+          </View>
         </View>
 
         {/* Calendar */}
@@ -95,12 +174,18 @@ export default function FoodScreen() {
             entries.map(entry => (
               <View key={entry.id} style={styles.entryCard}>
                 <View style={styles.entryIcon}>
-                  <Ionicons name="restaurant" size={18} color="#BB86FC" />
+                  <Ionicons name={getCategoryIcon(entry.category)} size={18} color="#BB86FC" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.entryName}>{entry.name}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.entryName}>{entry.name}</Text>
+                    <Text style={styles.entryCategoryBadge}>{entry.category}</Text>
+                  </View>
                   <Text style={styles.entryTime}>
                     {entry.time} · {entry.calories} cal
+                  </Text>
+                  <Text style={styles.entryMacros}>
+                    P: {entry.protein}g · C: {entry.carbs}g · F: {entry.fats}g
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -133,27 +218,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-  summaryCard: {
+  dashboardCard: {
     marginHorizontal: 16,
     marginBottom: 16,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#1e1e1e',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#333',
-    alignItems: 'center',
+  },
+  dashRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  summaryValue: {
-    fontSize: 36,
+  dashItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dashValue: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#BB86FC',
+    color: '#fff',
   },
-  summaryUnit: {
-    fontSize: 14,
+  dashLabel: {
+    fontSize: 11,
     color: '#888',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  dashDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#333',
+  },
+  macroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  macroItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  macroValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e0e0e0',
+  },
+  macroLabel: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
+    textTransform: 'uppercase',
   },
   calendarContainer: {
     marginHorizontal: 16,
@@ -207,10 +327,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
     fontWeight: '500',
+    marginBottom: 2,
+  },
+  entryCategoryBadge: {
+    fontSize: 10,
+    color: '#BB86FC',
+    backgroundColor: 'rgba(187, 134, 252, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(187, 134, 252, 0.2)',
   },
   entryTime: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#888',
+  },
+  entryMacros: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
   },
   deleteButton: {
     width: 32,

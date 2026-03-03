@@ -23,7 +23,11 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       name TEXT NOT NULL,
       calories INTEGER NOT NULL,
       date TEXT NOT NULL,
-      time TEXT NOT NULL
+      time TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'Snack',
+      protein INTEGER NOT NULL DEFAULT 0,
+      carbs INTEGER NOT NULL DEFAULT 0,
+      fats INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS exercise_entries (
@@ -62,6 +66,24 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
   } catch {
     // Column already exists — ignore
   }
+
+  // Migration: add category and macro columns to food_entries
+  try {
+    await database.runAsync(
+      "ALTER TABLE food_entries ADD COLUMN category TEXT NOT NULL DEFAULT 'Snack'"
+    );
+    await database.runAsync(
+      "ALTER TABLE food_entries ADD COLUMN protein INTEGER NOT NULL DEFAULT 0"
+    );
+    await database.runAsync(
+      "ALTER TABLE food_entries ADD COLUMN carbs INTEGER NOT NULL DEFAULT 0"
+    );
+    await database.runAsync(
+      "ALTER TABLE food_entries ADD COLUMN fats INTEGER NOT NULL DEFAULT 0"
+    );
+  } catch {
+    // Columns already exist — ignore
+  }
 }
 
 // ── Food CRUD ──
@@ -72,18 +94,26 @@ export interface FoodEntryRow {
   calories: number;
   date: string;
   time: string;
+  category: string;
+  protein: number;
+  carbs: number;
+  fats: number;
 }
 
 export async function addFoodEntry(
   name: string,
   calories: number,
+  category: string,
+  protein: number,
+  carbs: number,
+  fats: number,
   date: string,
   time: string
 ): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
-    'INSERT INTO food_entries (name, calories, date, time) VALUES (?, ?, ?, ?)',
-    [name, calories, date, time]
+    'INSERT INTO food_entries (name, calories, category, protein, carbs, fats, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [name, calories, category, protein, carbs, fats, date, time]
   );
 }
 
@@ -92,6 +122,15 @@ export async function getFoodEntries(date: string): Promise<FoodEntryRow[]> {
   return await database.getAllAsync<FoodEntryRow>(
     'SELECT * FROM food_entries WHERE date = ? ORDER BY id DESC',
     [date]
+  );
+}
+
+export async function getRecentFoods(limit = 10): Promise<FoodEntryRow[]> {
+  const database = await getDatabase();
+  // Group by name to get unique foods, ordered by most recently added
+  return await database.getAllAsync<FoodEntryRow>(
+    'SELECT * FROM food_entries GROUP BY name ORDER BY MAX(id) DESC LIMIT ?',
+    [limit]
   );
 }
 

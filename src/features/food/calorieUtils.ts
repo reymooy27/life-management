@@ -24,6 +24,21 @@ export function calculateNetCalories(
 }
 
 /**
+ * Calculate total macronutrients from a list of food entries.
+ */
+export function calculateDailyMacros(entries: Pick<FoodEntryRow, 'protein' | 'carbs' | 'fats'>[]) {
+  return entries.reduce(
+    (totals, entry) => {
+      totals.protein += entry.protein || 0;
+      totals.carbs += entry.carbs || 0;
+      totals.fats += entry.fats || 0;
+      return totals;
+    },
+    { protein: 0, carbs: 0, fats: 0 }
+  );
+}
+
+/**
  * Validate a string as a positive integer calorie value.
  * Returns the parsed number, or null if invalid.
  */

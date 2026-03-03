@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { addFoodEntry } from '../db/database';
+import { addFoodEntry, FoodEntryRow, getRecentFoods } from '../db/database';
 import { FoodItem, searchFoods } from '../features/food/calorieData';
 import { validateCalorieInput } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
@@ -20,8 +20,23 @@ export default function AddFoodScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [newFoodName, setNewFoodName] = useState('');
   const [newCalories, setNewCalories] = useState('');
+  const [category, setCategory] = useState('Snack');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fats, setFats] = useState('');
+
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
+  const [recentFoods, setRecentFoods] = useState<FoodEntryRow[]>([]);
   const [calorieError, setCalorieError] = useState('');
+
+  React.useEffect(() => {
+    loadRecentFoods();
+  }, []);
+
+  const loadRecentFoods = async () => {
+    const list = await getRecentFoods(5);
+    setRecentFoods(list);
+  };
 
   const handleSearch = (text: string) => {
     setNewFoodName(text);
@@ -33,9 +48,21 @@ export default function AddFoodScreen() {
     }
   };
 
-  const selectFood = (item: FoodItem) => {
+  const selectFood = (item: FoodItem | FoodEntryRow) => {
     setNewFoodName(item.name);
-    setNewCalories(String(item.caloriesPerServing));
+    if ('caloriesPerServing' in item) {
+      setNewCalories(String(item.caloriesPerServing));
+      setCategory(item.category || 'Snack');
+      setProtein(item.protein ? String(item.protein) : '');
+      setCarbs(item.carbs ? String(item.carbs) : '');
+      setFats(item.fats ? String(item.fats) : '');
+    } else {
+      setNewCalories(String(item.calories));
+      setCategory(item.category || 'Snack');
+      setProtein(String(item.protein || 0));
+      setCarbs(String(item.carbs || 0));
+      setFats(String(item.fats || 0));
+    }
     setSearchResults([]);
   };
 
@@ -49,19 +76,38 @@ export default function AddFoodScreen() {
       setCalorieError('Enter a valid calorie count');
       return;
     }
+    const p = protein ? validateCalorieInput(protein) || 0 : 0;
+    const c = carbs ? validateCalorieInput(carbs) || 0 : 0;
+    const f = fats ? validateCalorieInput(fats) || 0 : 0;
+
     setCalorieError('');
     const today = new Date().toISOString().split('T')[0];
     const time = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
-    await addFoodEntry(newFoodName.trim(), cal, today, time);
+    await addFoodEntry(newFoodName.trim(), cal, category, p, c, f, today, time);
     navigation.goBack();
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.form}>
+        <Text style={styles.label}>Meal Category</Text>
+        <View style={styles.segmentContainer}>
+          {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.segment, category === cat && styles.segmentActive]}
+              onPress={() => setCategory(cat)}
+            >
+              <Text style={[styles.segmentText, category === cat && styles.segmentTextActive]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={styles.label}>Food Name</Text>
         <TextInput
           style={styles.input}
@@ -94,18 +140,84 @@ export default function AddFoodScreen() {
           </View>
         )}
 
-        <Text style={styles.label}>Calories</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Calories"
-          placeholderTextColor="#666"
-          value={newCalories}
-          onChangeText={text => {
-            setNewCalories(text);
-            setCalorieError('');
-          }}
-          keyboardType="numeric"
-        />
+        {searchResults.length === 0 && !newFoodName && recentFoods.length > 0 && (
+          <View style={styles.recentContainer}>
+            <Text style={styles.recentTitle}>Recent Foods</Text>
+            {recentFoods.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.recentItem}
+                onPress={() => selectFood(item)}
+              >
+                <Ionicons name="time-outline" size={18} color="#03DAC6" />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.recentItemName}>{item.name}</Text>
+                  <Text style={styles.recentItemDetail}>
+                    {item.calories} cal · {item.category}
+                  </Text>
+                </View>
+                <Ionicons name="add-circle-outline" size={20} color="#666" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.row}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Calories</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor="#666"
+              value={newCalories}
+              onChangeText={text => {
+                setNewCalories(text);
+                setCalorieError('');
+              }}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <View style={[styles.row, { marginTop: 12 }]}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Protein (g)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor="#666"
+              value={protein}
+              onChangeText={setProtein}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Carbs (g)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor="#666"
+              value={carbs}
+              onChangeText={setCarbs}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={{ width: 12 }} />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Fats (g)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              placeholderTextColor="#666"
+              value={fats}
+              onChangeText={setFats}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+
 
         {calorieError ? <Text style={styles.errorText}>{calorieError}</Text> : null}
 
@@ -145,6 +257,37 @@ const styles = StyleSheet.create({
     borderColor: '#333',
     fontSize: 16,
   },
+  row: {
+    flexDirection: 'row',
+  },
+  inputGroup: {
+    flex: 1,
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1e1e1e',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    padding: 4,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  segmentActive: {
+    backgroundColor: '#333',
+  },
+  segmentText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: '#fff',
+  },
   searchList: {
     backgroundColor: '#1e1e1e',
     borderRadius: 12,
@@ -167,6 +310,38 @@ const styles = StyleSheet.create({
   searchItemCal: {
     fontSize: 12,
     color: '#888',
+  },
+  recentContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  recentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e0e0e0',
+    marginBottom: 12,
+  },
+  recentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1e1e1e',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  recentItemName: {
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '500',
+  },
+  recentItemDetail: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
   },
   errorText: {
     color: '#CF6679',
