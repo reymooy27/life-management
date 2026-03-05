@@ -2,6 +2,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SplashScreen from 'expo-splash-screen';
 import React from 'react';
+import { initNotifications } from './src/features/notifications/notificationService';
 import AddExerciseScreen from './src/screens/AddExerciseScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
 import AddFoodScreen from './src/screens/AddFoodScreen';
@@ -31,6 +32,9 @@ export default function App() {
   React.useEffect(() => {
     // Hide the splash screen after the component mounts
     SplashScreen.hideAsync();
+
+    // Setup local notifications based on user settings
+    initNotifications();
   }, []);
 
   return (

@@ -159,6 +159,24 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
   } catch {
     // Column already exists — ignore
   }
+
+  // Migration: add notifications settings
+  try {
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN water_notif_enabled INTEGER NOT NULL DEFAULT 0"
+    );
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN water_notif_interval_hours REAL NOT NULL DEFAULT 2"
+    );
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN exercise_morning_notif_enabled INTEGER NOT NULL DEFAULT 0"
+    );
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN exercise_afternoon_notif_enabled INTEGER NOT NULL DEFAULT 0"
+    );
+  } catch {
+    // Columns already exist — ignore
+  }
 }
 
 // ── Food CRUD ──
@@ -317,6 +335,10 @@ export interface UserSettings {
   gender: string | null;
   activity_level: string | null;
   water_goal_ml: number | null;
+  water_notif_enabled?: number;
+  water_notif_interval_hours?: number;
+  exercise_morning_notif_enabled?: number;
+  exercise_afternoon_notif_enabled?: number;
 }
 
 export async function getUserSettings(): Promise<UserSettings | null> {
@@ -332,8 +354,11 @@ export async function saveUserSettings(
 ): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(
-    `INSERT OR REPLACE INTO user_settings (id, weight_kg, height_cm, birthdate, gender, activity_level, water_goal_ml)
-     VALUES (1, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO user_settings (
+       id, weight_kg, height_cm, birthdate, gender, activity_level, water_goal_ml,
+       water_notif_enabled, water_notif_interval_hours, exercise_morning_notif_enabled, exercise_afternoon_notif_enabled
+     )
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       settings.weight_kg ?? null,
       settings.height_cm ?? null,
@@ -341,6 +366,10 @@ export async function saveUserSettings(
       settings.gender ?? null,
       settings.activity_level ?? null,
       settings.water_goal_ml ?? 2500,
+      settings.water_notif_enabled ?? 0,
+      settings.water_notif_interval_hours ?? 2,
+      settings.exercise_morning_notif_enabled ?? 0,
+      settings.exercise_afternoon_notif_enabled ?? 0,
     ]
   );
 }

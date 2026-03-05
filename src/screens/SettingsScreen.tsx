@@ -10,6 +10,7 @@ import {
     Platform,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getUserSettings, saveUserSettings } from '../db/database';
+import { initNotifications } from '../features/notifications/notificationService';
 import {
     ACTIVITY_LEVELS,
     calculateAge,
@@ -36,8 +38,15 @@ export default function SettingsScreen() {
   const [activityLevel, setActivityLevel] = useState('');
   const [waterGoal, setWaterGoal] = useState<number | null>(null);
 
+  // Notification settings
+  const [waterNotifEnabled, setWaterNotifEnabled] = useState(false);
+  const [waterNotifInterval, setWaterNotifInterval] = useState(2);
+  const [exerciseMorningEnabled, setExerciseMorningEnabled] = useState(false);
+  const [exerciseAfternoonEnabled, setExerciseAfternoonEnabled] = useState(false);
+
   const [isCalendarVisible, setCalendarVisible] = useState(false);
   const [isActivityModalVisible, setActivityModalVisible] = useState(false);
+  const [isWaterIntervalVisible, setWaterIntervalVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Derived metrics
@@ -61,6 +70,10 @@ export default function SettingsScreen() {
         setGender((settings.gender as 'Male' | 'Female') || null);
         setActivityLevel(settings.activity_level || '');
         setWaterGoal(settings.water_goal_ml || null);
+        setWaterNotifEnabled(!!settings.water_notif_enabled);
+        setWaterNotifInterval(settings.water_notif_interval_hours || 2);
+        setExerciseMorningEnabled(!!settings.exercise_morning_notif_enabled);
+        setExerciseAfternoonEnabled(!!settings.exercise_afternoon_notif_enabled);
       }
     } catch (error) {
       console.error('Failed to load settings', error);
@@ -91,7 +104,14 @@ export default function SettingsScreen() {
         gender: gender || null,
         activity_level: activityLevel || null,
         water_goal_ml: waterGoal,
+        water_notif_enabled: waterNotifEnabled ? 1 : 0,
+        water_notif_interval_hours: waterNotifInterval,
+        exercise_morning_notif_enabled: exerciseMorningEnabled ? 1 : 0,
+        exercise_afternoon_notif_enabled: exerciseAfternoonEnabled ? 1 : 0,
       });
+
+      // Re-initialize notifications with new settings
+      await initNotifications();
 
       navigation.goBack();
     } catch (error) {
@@ -105,6 +125,18 @@ export default function SettingsScreen() {
   const getActiveLevelLabel = () => {
     const level = ACTIVITY_LEVELS.find(l => l.value === activityLevel);
     return level ? level.label : 'Select Activity Level';
+  };
+
+  const WATER_INTERVAL_OPTIONS = [
+    { label: 'Every 1 Hour', value: 1 },
+    { label: 'Every 1.5 Hours', value: 1.5 },
+    { label: 'Every 2 Hours (Recommended)', value: 2 },
+    { label: 'Every 3 Hours', value: 3 },
+  ];
+
+  const getWaterIntervalLabel = () => {
+    const opt = WATER_INTERVAL_OPTIONS.find(o => o.value === waterNotifInterval);
+    return opt ? opt.label : 'Every 2 Hours';
   };
 
   return (
@@ -212,6 +244,63 @@ export default function SettingsScreen() {
           <Text style={styles.metricsHint}>
             Fill in all profile details to see your calculated Basal Metabolic Rate and Total Daily Energy Expenditure.
           </Text>
+        </View>
+
+        {/* Notifications Section */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+
+          <View style={styles.settingRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingLabel}>Water Reminders</Text>
+              <Text style={styles.settingHint}>Hydration reminders (7 AM - 9 PM)</Text>
+            </View>
+            <Switch
+              value={waterNotifEnabled}
+              onValueChange={setWaterNotifEnabled}
+              trackColor={{ false: '#333', true: '#BB86FC' }}
+              thumbColor={waterNotifEnabled ? '#121212' : '#888'}
+            />
+          </View>
+
+          {waterNotifEnabled && (
+            <View style={styles.nestedSetting}>
+              <Text style={styles.label}>Reminder Interval</Text>
+              <TouchableOpacity
+                style={styles.selectorButton}
+                onPress={() => setWaterIntervalVisible(true)}
+              >
+                <Text style={styles.selectorText}>{getWaterIntervalLabel()}</Text>
+                <Ionicons name="chevron-down" size={20} color="#888" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={[styles.settingRow, { marginTop: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingLabel}>Morning Exercise</Text>
+              <Text style={styles.settingHint}>Reminder at 7:00 AM if not logged</Text>
+            </View>
+            <Switch
+              value={exerciseMorningEnabled}
+              onValueChange={setExerciseMorningEnabled}
+              trackColor={{ false: '#333', true: '#03DAC6' }}
+              thumbColor={exerciseMorningEnabled ? '#121212' : '#888'}
+            />
+          </View>
+
+          <View style={[styles.settingRow, { marginTop: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.settingLabel}>Afternoon Exercise</Text>
+              <Text style={styles.settingHint}>Reminder at 5:00 PM to wrap up</Text>
+            </View>
+            <Switch
+              value={exerciseAfternoonEnabled}
+              onValueChange={setExerciseAfternoonEnabled}
+              trackColor={{ false: '#333', true: '#03DAC6' }}
+              thumbColor={exerciseAfternoonEnabled ? '#121212' : '#888'}
+            />
+          </View>
         </View>
 
         {/* Save Button */}
@@ -324,6 +413,45 @@ export default function SettingsScreen() {
                 </Text>
                 {activityLevel === level.value && (
                   <Ionicons name="checkmark" size={20} color="#03DAC6" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Water Interval Modal */}
+      <Modal visible={isWaterIntervalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBottomSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reminder Interval</Text>
+              <TouchableOpacity onPress={() => setWaterIntervalVisible(false)}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {WATER_INTERVAL_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[
+                  styles.optionButton,
+                  waterNotifInterval === opt.value && styles.optionButtonActive,
+                ]}
+                onPress={() => {
+                  setWaterNotifInterval(opt.value);
+                  setWaterIntervalVisible(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    waterNotifInterval === opt.value && styles.optionTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+                {waterNotifInterval === opt.value && (
+                  <Ionicons name="checkmark" size={20} color="#BB86FC" />
                 )}
               </TouchableOpacity>
             ))}
@@ -472,6 +600,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#000',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  settingHint: {
+    fontSize: 13,
+    color: '#888',
+  },
+  nestedSetting: {
+    marginTop: 12,
+    marginLeft: 0,
+    borderLeftWidth: 2,
+    borderLeftColor: '#333',
+    paddingLeft: 16,
   },
   modalOverlay: {
     flex: 1,
