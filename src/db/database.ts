@@ -79,6 +79,24 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
       name TEXT NOT NULL,
       amount_ml INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS portfolio_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      asset_name TEXT NOT NULL,
+      ticker TEXT NOT NULL,
+      asset_type TEXT NOT NULL DEFAULT 'crypto',
+      buy_price REAL NOT NULL,
+      quantity REAL NOT NULL,
+      current_price REAL NOT NULL DEFAULT 0,
+      date_added TEXT NOT NULL,
+      notes TEXT DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL UNIQUE,
+      total_value_usd REAL NOT NULL DEFAULT 0
+    );
   `);
 
   // Seed default expense categories if empty
@@ -512,4 +530,86 @@ export async function addWaterPreset(name: string, amountMl: number): Promise<vo
 export async function deleteWaterPreset(id: number): Promise<void> {
   const database = await getDatabase();
   await database.runAsync('DELETE FROM water_presets WHERE id = ?', [id]);
+}
+
+// ── Portfolio CRUD ──
+
+export interface PortfolioEntryRow {
+  id: number;
+  asset_name: string;
+  ticker: string;
+  asset_type: string;
+  buy_price: number;
+  quantity: number;
+  current_price: number;
+  date_added: string;
+  notes: string;
+}
+
+export async function addPortfolioEntry(
+  assetName: string,
+  ticker: string,
+  assetType: string,
+  buyPrice: number,
+  quantity: number,
+  dateAdded: string,
+  notes: string = ''
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT INTO portfolio_entries (asset_name, ticker, asset_type, buy_price, quantity, date_added, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [assetName, ticker.toUpperCase(), assetType, buyPrice, quantity, dateAdded, notes]
+  );
+}
+
+export async function getPortfolioEntries(): Promise<PortfolioEntryRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<PortfolioEntryRow>(
+    'SELECT * FROM portfolio_entries ORDER BY id DESC'
+  );
+}
+
+export async function deletePortfolioEntry(id: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync('DELETE FROM portfolio_entries WHERE id = ?', [id]);
+}
+
+export async function updatePortfolioEntryPrice(id: number, currentPrice: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE portfolio_entries SET current_price = ? WHERE id = ?',
+    [currentPrice, id]
+  );
+}
+
+export async function updatePortfolioEntryPriceByTicker(ticker: string, assetType: string, currentPrice: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE portfolio_entries SET current_price = ? WHERE UPPER(ticker) = UPPER(?) AND asset_type = ?',
+    [currentPrice, ticker, assetType]
+  );
+}
+
+// ── Portfolio Snapshots ──
+
+export interface PortfolioSnapshotRow {
+  id: number;
+  date: string;
+  total_value_usd: number;
+}
+
+export async function savePortfolioSnapshot(date: string, totalValueUsd: number): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'INSERT OR REPLACE INTO portfolio_snapshots (date, total_value_usd) VALUES (?, ?)',
+    [date, totalValueUsd]
+  );
+}
+
+export async function getPortfolioSnapshots(limit = 30): Promise<PortfolioSnapshotRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<PortfolioSnapshotRow>(
+    'SELECT * FROM portfolio_snapshots ORDER BY date ASC LIMIT ?',
+    [limit]
+  );
 }

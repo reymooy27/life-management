@@ -9,4 +9,6 @@ export type RootStackParamList = {
   Settings: undefined;
   Water: undefined;
   AddWater: undefined;
+  Portfolio: undefined;
+  AddInvestment: undefined;
 };

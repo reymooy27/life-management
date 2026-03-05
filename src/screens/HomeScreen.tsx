@@ -18,18 +18,24 @@ import {
     ExerciseEntryRow,
     ExpenseEntryRow,
     FoodEntryRow,
+    PortfolioEntryRow,
     UserSettings,
     WaterEntryRow,
     getExerciseEntries,
     getFoodEntries,
     getMonthlyExpenses,
+    getPortfolioEntries,
     getUserSettings,
     getWaterEntries,
 } from '../db/database';
 import { calculateMonthlyTotal, groupByCategory } from '../features/finance/financeUtils';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
+import {
+    calculateTotalInvestedUsd,
+    calculateTotalPortfolioValueUsd,
+} from '../features/portfolio/portfolioUtils';
 import { RootStackParamList } from '../types/navigation';
-import { formatIDR } from '../utils/currency';
+import { formatIDR, formatUSD } from '../utils/currency';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -84,6 +90,15 @@ const FEATURES: FeaturePage[] = [
     route: 'Water',
     addRoute: 'AddWater',
   },
+  {
+    key: 'portfolio',
+    title: 'Portfolio',
+    subtitle: 'Track investments, PnL,\nand portfolio allocation',
+    icon: 'trending-up',
+    accentColor: '#4CAF50',
+    route: 'Portfolio',
+    addRoute: 'AddInvestment',
+  },
 ];
 
 // Repeat data for infinite loop scrolling
@@ -113,6 +128,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
   const [monthlyExpenses, setMonthlyExpenses] = useState<ExpenseEntryRow[]>([]);
   const [waterEntries, setWaterEntries] = useState<WaterEntryRow[]>([]);
+  const [portfolioEntries, setPortfolioEntries] = useState<PortfolioEntryRow[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -122,18 +138,20 @@ export default function HomeScreen({ navigation }: Props) {
   const loadDashboardData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0];
     const yearMonth = today.substring(0, 7);
-    const [food, exercise, expenses, water, settings] = await Promise.all([
+    const [food, exercise, expenses, water, settings, portfolio] = await Promise.all([
       getFoodEntries(today),
       getExerciseEntries(today),
       getMonthlyExpenses(yearMonth),
       getWaterEntries(today),
       getUserSettings(),
+      getPortfolioEntries(),
     ]);
     setFoodEntries(food);
     setExerciseEntries(exercise);
     setMonthlyExpenses(expenses);
     setWaterEntries(water);
     setUserSettings(settings);
+    setPortfolioEntries(portfolio);
     setDataLoaded(true);
   }, []);
 
@@ -291,6 +309,37 @@ export default function HomeScreen({ navigation }: Props) {
               <View style={styles.dashItem}>
                 <Text style={[styles.dashValue, { color: '#2196F3' }]}>{progress}%</Text>
                 <Text style={styles.dashLabel}>of {goal}ml goal</Text>
+              </View>
+            </View>
+          </View>
+        );
+      }
+      case 'portfolio': {
+        const rate = 16000; // fallback rate for home dashboard
+        const totalValue = calculateTotalPortfolioValueUsd(portfolioEntries, rate);
+        const totalInvested = calculateTotalInvestedUsd(portfolioEntries, rate);
+        const pnl = totalValue - totalInvested;
+        const holdingCount = portfolioEntries.length;
+        return (
+          <View style={styles.dashboardCard}>
+            <View style={styles.dashRow}>
+              <View style={styles.dashItem}>
+                <Text style={[styles.dashValue, { color: '#4CAF50' }]}>
+                  {holdingCount > 0 ? formatUSD(totalValue) : '—'}
+                </Text>
+                <Text style={styles.dashLabel}>portfolio value</Text>
+              </View>
+              <View style={styles.dashDivider} />
+              <View style={styles.dashItem}>
+                <Text
+                  style={[
+                    styles.dashValue,
+                    { color: pnl >= 0 ? '#4CAF50' : '#CF6679' },
+                  ]}
+                >
+                  {holdingCount > 0 ? `${pnl >= 0 ? '+' : ''}${formatUSD(pnl)}` : '—'}
+                </Text>
+                <Text style={styles.dashLabel}>total pnl</Text>
               </View>
             </View>
           </View>
