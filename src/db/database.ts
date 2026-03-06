@@ -613,3 +613,11 @@ export async function getPortfolioSnapshots(limit = 30): Promise<PortfolioSnapsh
     [limit]
   );
 }
+
+export async function getTransactionHistoryForAsset(ticker: string, assetType: string): Promise<PortfolioEntryRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<PortfolioEntryRow>(
+    'SELECT * FROM portfolio_entries WHERE UPPER(ticker) = UPPER(?) AND asset_type = ? ORDER BY date_added DESC, id DESC',
+    [ticker, assetType]
+  );
+}

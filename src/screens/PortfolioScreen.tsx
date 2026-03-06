@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ import {
   calculateTotalPortfolioValueUsd,
   formatAssetCurrency,
   groupByAsset,
+  groupHoldings,
 } from '../features/portfolio/portfolioUtils';
 import { fetchAllPrices, fetchUsdToIdrRate } from '../features/portfolio/priceService';
 import { RootStackParamList } from '../types/navigation';
@@ -141,6 +143,7 @@ export default function PortfolioScreen() {
   };
 
   const allocation = groupByAsset(entries);
+  const groupedHoldings = groupHoldings(entries);
 
   // Chart data
   let chartData = snapshots.map(s => ({
@@ -165,7 +168,17 @@ export default function PortfolioScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView keyboardShouldPersistTaps="handled">
+      <ScrollView 
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefreshPrices}
+            tintColor="#4CAF50"
+            colors={['#4CAF50']}
+          />
+        }
+      >
         {/* Currency Toggle */}
         <View style={styles.toggleRow}>
           <TouchableOpacity
@@ -203,39 +216,26 @@ export default function PortfolioScreen() {
           </View>
         </View>
 
-        {/* PnL Banner */}
-        <View style={[styles.pnlBanner, { borderColor: totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679' }]}>
-          <View style={styles.pnlRow}>
-            <Ionicons
-              name={totalPnlUsd >= 0 ? 'trending-up' : 'trending-down'}
-              size={24}
-              color={totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679'}
-            />
-            <View style={styles.pnlTextContainer}>
-              <Text style={[styles.pnlValue, { color: totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679' }]}>
-                {totalPnlUsd >= 0 ? '+' : ''}{formatTotal(totalPnlUsd)}
-              </Text>
-              <Text style={[styles.pnlPercent, { color: totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679' }]}>
-                {totalPnlUsd >= 0 ? '+' : ''}{totalPnlPercent.toFixed(2)}%
-              </Text>
+        {/* Portfolio Line Chart & PnL Combined */}
+        <View style={styles.chartContainer}>
+          {/* PnL Header inside Chart */}
+          <View style={styles.pnlHeader}>
+            <View style={styles.pnlRow}>
+              <Ionicons
+                name={totalPnlUsd >= 0 ? 'trending-up' : 'trending-down'}
+                size={28}
+                color={totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679'}
+              />
+              <View style={styles.pnlTextContainer}>
+                <Text style={[styles.pnlValue, { color: totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679' }]}>
+                  {totalPnlUsd >= 0 ? '+' : ''}{formatTotal(totalPnlUsd)}
+                </Text>
+                <Text style={[styles.pnlPercent, { color: totalPnlUsd >= 0 ? '#4CAF50' : '#CF6679' }]}>
+                  {totalPnlUsd >= 0 ? '+' : ''}{totalPnlPercent.toFixed(2)}%
+                </Text>
+              </View>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={handleRefreshPrices}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <ActivityIndicator size="small" color="#4CAF50" />
-            ) : (
-              <Ionicons name="refresh" size={20} color="#4CAF50" />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Portfolio Line Chart */}
-        <View style={styles.chartContainer}>
-          <Text style={styles.sectionTitle}>Portfolio History</Text>
           <LineChart
             data={chartData}
             width={SCREEN_WIDTH - 80}
@@ -288,7 +288,7 @@ export default function PortfolioScreen() {
         <View style={styles.listContainer}>
           <Text style={styles.sectionTitle}>Holdings</Text>
 
-          {entries.length === 0 ? (
+          {groupedHoldings.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="trending-up-outline" size={32} color="#444" />
               <Text style={styles.emptyStateText}>
@@ -296,73 +296,84 @@ export default function PortfolioScreen() {
               </Text>
             </View>
           ) : (
-            entries.map((entry, idx) => {
+            groupedHoldings.map((group, idx) => {
               const { pnl, pnlPercent } = calculatePnL(
-                entry.buy_price,
-                entry.current_price,
-                entry.quantity
+                group.average_buy_price,
+                group.current_price,
+                group.total_quantity
               );
-              const assetInfo = ASSET_TYPE_ICONS[entry.asset_type] || ASSET_TYPE_ICONS.custom;
-              const fmt = (v: number) => formatAssetCurrency(v, entry);
+              const assetInfo = ASSET_TYPE_ICONS[group.asset_type] || ASSET_TYPE_ICONS.custom;
+              const fmt = (v: number) => formatAssetCurrency(v, group);
+              
+              // We don't have individual entry ids here, but we use the composite key for the mapped key
+              const groupKey = `${group.asset_type}-${group.ticker}`;
+              
               return (
-                <View
-                  key={entry.id}
-                  style={[styles.holdingCard, idx % 2 === 0 && styles.holdingCardAlt]}
+                <TouchableOpacity
+                  key={groupKey}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate('AssetTransactions', {
+                    ticker: group.ticker,
+                    asset_type: group.asset_type,
+                    asset_name: group.asset_name,
+                  })}
                 >
-                  <View style={styles.holdingHeader}>
-                    <View style={[styles.assetIcon, { borderColor: assetInfo.color }]}>
-                      <Ionicons name={assetInfo.icon} size={18} color={assetInfo.color} />
+                  <View
+                    style={[styles.holdingCard, idx % 2 === 0 && styles.holdingCardAlt]}
+                  >
+                    <View style={styles.holdingHeader}>
+                      <View style={[styles.assetIcon, { borderColor: assetInfo.color }]}>
+                        <Ionicons name={assetInfo.icon} size={18} color={assetInfo.color} />
+                      </View>
+                      {/* Left: Total Initial Subtitle */}
+                      <View style={styles.holdingNameCol}>
+                        <Text style={styles.holdingName}>{group.asset_name}</Text>
+                        <Text style={styles.holdingTicker}>
+                          {group.ticker} · {group.asset_type.toUpperCase()}
+                        </Text>
+                        <Text style={styles.holdingSubtext}>
+                          Invested: {fmt(group.total_invested)}
+                        </Text>
+                      </View>
+                      
+                      {/* Right: Current Value Total Colored */}
+                      <View style={styles.holdingPnlCol}>
+                        <Text
+                          style={[styles.holdingPnl, { color: pnl >= 0 ? '#4CAF50' : '#CF6679' }]}
+                        >
+                          {fmt(group.total_value)}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.holdingPnlPercent,
+                            { color: pnl >= 0 ? '#4CAF50' : '#CF6679' },
+                          ]}
+                        >
+                          {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.holdingNameCol}>
-                      <Text style={styles.holdingName}>{entry.asset_name}</Text>
-                      <Text style={styles.holdingTicker}>
-                        {entry.ticker} · {entry.asset_type.toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.holdingPnlCol}>
-                      <Text
-                        style={[styles.holdingPnl, { color: pnl >= 0 ? '#4CAF50' : '#CF6679' }]}
-                      >
-                        {pnl >= 0 ? '+' : ''}{fmt(pnl)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.holdingPnlPercent,
-                          { color: pnl >= 0 ? '#4CAF50' : '#CF6679' },
-                        ]}
-                      >
-                        {pnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
-                      </Text>
+
+                    <View style={styles.holdingDetails}>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Qty</Text>
+                        <Text style={styles.detailValue}>
+                          {parseFloat(group.total_quantity.toFixed(8))}
+                        </Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Avg Buy</Text>
+                        <Text style={styles.detailValue}>{fmt(group.average_buy_price)}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Current</Text>
+                        <Text style={[styles.detailValue, { color: '#4CAF50' }]}>
+                          {group.current_price > 0 ? fmt(group.current_price) : '—'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-
-                  <View style={styles.holdingDetails}>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>Qty</Text>
-                      <Text style={styles.detailValue}>{entry.quantity}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>Avg Buy</Text>
-                      <Text style={styles.detailValue}>{fmt(entry.buy_price)}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>Current</Text>
-                      <Text style={[styles.detailValue, { color: '#4CAF50' }]}>
-                        {entry.current_price > 0 ? fmt(entry.current_price) : '—'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => confirmDelete(entry.id, entry.asset_name)}
-                    >
-                      <Ionicons name="close" size={14} color="#CF6679" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {entry.notes ? (
-                    <Text style={styles.holdingNotes}>{entry.notes}</Text>
-                  ) : null}
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -448,33 +459,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4CAF50',
   },
-  pnlBanner: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#1e1e1e',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  pnlHeader: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
   pnlRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
   pnlTextContainer: {
     gap: 2,
     flex: 1,
   },
   pnlValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
   },
   pnlPercent: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   refreshButton: {
@@ -561,13 +566,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   holdingPnl: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   holdingPnlPercent: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
+  },
+  holdingSubtext: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 6,
   },
   holdingDetails: {
     flexDirection: 'row',

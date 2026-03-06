@@ -11,4 +11,9 @@ export type RootStackParamList = {
   AddWater: undefined;
   Portfolio: undefined;
   AddInvestment: undefined;
+  AssetTransactions: {
+    ticker: string;
+    asset_type: string;
+    asset_name: string;
+  };
 };

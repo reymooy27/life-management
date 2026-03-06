@@ -80,14 +80,66 @@ export function calculateTotalInvested(
 }
 
 /**
- * Group entries by asset name and sum current values.
+ * Group entries by ticker and sum current values.
  */
 export function groupByAsset(
-  entries: Pick<PortfolioEntryRow, 'asset_name' | 'current_price' | 'quantity'>[]
+  entries: Pick<PortfolioEntryRow, 'ticker' | 'current_price' | 'quantity'>[]
 ): Record<string, number> {
   const groups: Record<string, number> = {};
   for (const e of entries) {
-    groups[e.asset_name] = (groups[e.asset_name] || 0) + e.current_price * e.quantity;
+    const ticker = e.ticker.toUpperCase();
+    groups[ticker] = (groups[ticker] || 0) + e.current_price * e.quantity;
   }
   return groups;
+}
+
+export interface GroupedPortfolioEntry {
+  asset_name: string;
+  ticker: string;
+  asset_type: string;
+  total_quantity: number;
+  average_buy_price: number;
+  current_price: number;
+  total_value: number;
+  total_invested: number;
+}
+
+/**
+ * Group portfolio entries by ticker and asset_type to aggregate multiple purchases.
+ */
+export function groupHoldings(
+  entries: PortfolioEntryRow[]
+): GroupedPortfolioEntry[] {
+  const grouped = new Map<string, GroupedPortfolioEntry>();
+
+  for (const entry of entries) {
+    // Unique key per asset
+    const key = `${entry.asset_type}-${entry.ticker.toUpperCase()}`;
+    const invested = entry.buy_price * entry.quantity;
+    const currentValue = entry.current_price * entry.quantity;
+
+    if (grouped.has(key)) {
+      const existing = grouped.get(key)!;
+      existing.total_quantity += entry.quantity;
+      existing.total_invested += invested;
+      existing.total_value += currentValue;
+      // Average buy price = total invested / total quantity
+      existing.average_buy_price = existing.total_quantity > 0 
+        ? existing.total_invested / existing.total_quantity 
+        : 0;
+    } else {
+      grouped.set(key, {
+        asset_name: entry.asset_name,
+        ticker: entry.ticker.toUpperCase(),
+        asset_type: entry.asset_type,
+        total_quantity: entry.quantity,
+        average_buy_price: entry.buy_price,
+        current_price: entry.current_price,
+        total_value: currentValue,
+        total_invested: invested,
+      });
+    }
+  }
+
+  return Array.from(grouped.values());
 }

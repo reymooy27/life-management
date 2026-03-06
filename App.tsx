@@ -8,6 +8,7 @@ import AddExpenseScreen from './src/screens/AddExpenseScreen';
 import AddFoodScreen from './src/screens/AddFoodScreen';
 import AddInvestmentScreen from './src/screens/AddInvestmentScreen';
 import AddWaterScreen from './src/screens/AddWaterScreen';
+import AssetTransactionsScreen from './src/screens/AssetTransactionsScreen';
 import ExerciseScreen from './src/screens/ExerciseScreen';
 import FinanceScreen from './src/screens/FinanceScreen';
 import FoodScreen from './src/screens/FoodScreen';
@@ -179,6 +180,18 @@ export default function App() {
             gestureEnabled: true,
             animationDuration: 300,
             animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="AssetTransactions"
+          component={AssetTransactionsScreen}
+          options={{
+            ...HEADER_STYLE,
+            headerShown: true,
+            title: 'Transactions',
+            gestureEnabled: true,
+            animationDuration: 300,
+            animation: 'slide_from_right',
           }}
         />
       </Stack.Navigator>
