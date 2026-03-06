@@ -4,35 +4,36 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-    Dimensions,
-    FlatList,
-    LayoutChangeEvent,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-    ViewToken,
+  Dimensions,
+  FlatList,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewToken,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ExpensePieChart from '../components/ExpensePieChart';
 import {
-    ExerciseEntryRow,
-    ExpenseEntryRow,
-    FoodEntryRow,
-    PortfolioEntryRow,
-    UserSettings,
-    WaterEntryRow,
-    getExerciseEntries,
-    getFoodEntries,
-    getMonthlyExpenses,
-    getPortfolioEntries,
-    getUserSettings,
-    getWaterEntries,
+  ExerciseEntryRow,
+  ExpenseEntryRow,
+  FoodEntryRow,
+  PortfolioEntryRow,
+  UserSettings,
+  WaterEntryRow,
+  getExerciseEntries,
+  getFoodEntries,
+  getMonthlyExpenses,
+  getPortfolioEntries,
+  getUserSettings,
+  getWaterEntries,
 } from '../db/database';
 import { calculateMonthlyTotal, groupByCategory } from '../features/finance/financeUtils';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
 import {
-    calculateTotalInvestedUsd,
-    calculateTotalPortfolioValueUsd,
+  calculateTotalInvestedUsd,
+  calculateTotalPortfolioValueUsd,
 } from '../features/portfolio/portfolioUtils';
 import { RootStackParamList } from '../types/navigation';
 import { formatIDR, formatUSD } from '../utils/currency';
@@ -49,8 +50,8 @@ interface FeaturePage {
   subtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   accentColor: string;
-  route: keyof RootStackParamList;
-  addRoute: keyof RootStackParamList;
+  route: Extract<keyof RootStackParamList, 'Food' | 'Exercise' | 'Money' | 'Water' | 'Portfolio'>;
+  addRoute: Extract<keyof RootStackParamList, 'AddFood' | 'AddExercise' | 'AddExpense' | 'AddWater' | 'AddInvestment'>;
 }
 
 const FEATURES: FeaturePage[] = [
@@ -265,30 +266,19 @@ export default function HomeScreen({ navigation }: Props) {
       case 'finance': {
         const monthTotal = calculateMonthlyTotal(monthlyExpenses);
         const catBreakdown = groupByCategory(monthlyExpenses);
-        const topCategories = Object.entries(catBreakdown)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3);
         const EMOJIS: Record<string, string> = {
           Food: '🍔', Transport: '🚗', Bills: '📄', Entertainment: '🎬', Other: '📦',
         };
         return (
-          <View style={styles.dashboardCard}>
-            <View style={styles.dashRow}>
-              <View style={styles.dashItem}>
-                <Text style={[styles.dashValue, { color: '#FFB74D' }]} numberOfLines={1} adjustsFontSizeToFit>
-                  {formatIDR(monthTotal)}
-                </Text>
-                <Text style={styles.dashLabel}>this month</Text>
-              </View>
-            </View>
-            {topCategories.length > 0 && (
-              <View style={styles.dashBreakdown}>
-                {topCategories.map(([cat, amt]) => (
-                  <View key={cat} style={styles.dashBreakdownItem}>
-                    <Text style={styles.dashBreakdownEmoji}>{EMOJIS[cat] || '📦'}</Text>
-                    <Text style={styles.dashBreakdownText}>{formatIDR(amt)}</Text>
-                  </View>
-                ))}
+          <View style={[styles.dashboardCard, { padding: 16 }]}>
+            {Object.keys(catBreakdown).length > 0 && (
+              <View style={{ }}>
+                <ExpensePieChart
+                  data={catBreakdown}
+                  categoryEmojis={EMOJIS}
+                  radius={60}
+                  innerRadius={45}
+                />
               </View>
             )}
           </View>

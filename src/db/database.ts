@@ -621,3 +621,16 @@ export async function getTransactionHistoryForAsset(ticker: string, assetType: s
     [ticker, assetType]
   );
 }
+
+
+export interface WaterHistoryRow {
+  date: string;
+  total_ml: number;
+}
+
+export async function getWaterHistory(days: number): Promise<WaterHistoryRow[]> {
+  const database = await getDatabase();
+  return await database.getAllAsync<WaterHistoryRow>(
+    'SELECT date, SUM(amount_ml) as total_ml FROM water_entries GROUP BY date ORDER BY date DESC LIMIT ?', [days]
+  );
+}

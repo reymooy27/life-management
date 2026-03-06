@@ -6,6 +6,7 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,23 +15,46 @@ import {
 import {
   UserSettings,
   WaterEntryRow,
+  WaterHistoryRow,
   deleteWaterEntry,
   getUserSettings,
   getWaterEntries,
+  getWaterHistory,
 } from '../db/database';
 import { RootStackParamList } from '../types/navigation';
+
+const getWeekDays = () => {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday...
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - dayOfWeek);
+
+  const week = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    // adjust for local timezone offset so ISOString gets the correct local date
+    const offset = d.getTimezoneOffset() * 60000;
+    const localDate = new Date(d.getTime() - offset);
+    week.push(localDate.toISOString().split('T')[0]);
+  }
+  return week;
+};
 
 export default function WaterScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [entries, setEntries] = useState<WaterEntryRow[]>([]);
+  const [history, setHistory] = useState<WaterHistoryRow[]>([]);
   const [goal, setGoal] = useState(2500);
 
   const loadData = useCallback(async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const data = await getWaterEntries(today);
+      const histData = await getWaterHistory(7);
       const settings = await getUserSettings();
       setEntries(data);
+      setHistory(histData.reverse()); // Show oldest to newest left to right
       if (settings?.water_goal_ml) {
         setGoal(settings.water_goal_ml);
       }
@@ -92,6 +116,49 @@ export default function WaterScreen() {
         <Text style={styles.percentageText}>{fillPercentage.toFixed(0)}% of daily goal</Text>
       </View>
 
+      {/* History Ribbon */}
+      <View style={styles.historyContainer}>
+        <Text style={styles.historyTitle}>This Week</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.historyScroll}>
+          {getWeekDays().map((dateStr, idx) => {
+            const isToday = dateStr === new Date().toISOString().split('T')[0];
+            const dayData = history.find(h => h.date === dateStr);
+            const totalMl = dayData ? dayData.total_ml : 0;
+            const pct = (totalMl / goal) * 100;
+            const hitGoal = pct >= 90;
+
+            const [y, m, d] = dateStr.split('-');
+            const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+
+            return (
+              <View key={idx} style={styles.streakDayContainer}>
+                {hitGoal ? (
+                  <View style={styles.streakFireCircle}>
+                    <Text style={styles.fireIcon}>🔥</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.streakCircle, isToday && styles.streakCircleToday]}>
+                    {totalMl > 0 ? (
+                      <Ionicons name="water" size={18} color={isToday ? "#2196F3" : "#444"} />
+                    ) : (
+                      <View style={{}} >
+                        <Text style={{ color: isToday ? '#2196F3' : '#666' }}>
+                          {parseInt(d)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+                <Text style={[styles.streakDayText, isToday && styles.streakDayTextToday]}>
+                  {isToday ? 'Today' : dayName}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Today's Logs</Text>
         <Text style={styles.entryCount}>{entries.length} entries</Text>
@@ -142,6 +209,63 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
+  },
+  historyContainer: {
+    marginBottom: 20,
+  },
+  historyTitle: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    paddingHorizontal: 24,
+    marginBottom: 8,
+  },
+  historyScroll: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  streakDayContainer: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  streakCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1a1a1a',
+    borderWidth: 2,
+    borderColor: '#333',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakCircleToday: {
+    borderColor: '#2196F3',
+    backgroundColor: '#162b3d',
+  },
+  streakFireCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderWidth: 2,
+    borderColor: '#FF9800',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fireIcon: {
+    fontSize: 22,
+  },
+  streakDayText: {
+    fontSize: 11,
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  streakDayTextToday: {
+    color: '#2196F3',
+    fontWeight: 'bold',
   },
   glassOutline: {
     width: 200,

@@ -11,7 +11,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import ExpenseBarChart from '../components/ExpenseBarChart';
+import ExpensePieChart from '../components/ExpensePieChart';
 import YearlyBarChart from '../components/YearlyBarChart';
 import {
     deleteExpense,
@@ -186,9 +186,8 @@ export default function FinanceScreen() {
         {Object.keys(categoryBreakdown).length > 0 && (
           <View style={styles.chartContainer}>
             <Text style={styles.sectionTitle}>Spending Breakdown</Text>
-            <ExpenseBarChart
+            <ExpensePieChart
               data={categoryBreakdown}
-              accentColor="#FFB74D"
               categoryEmojis={CATEGORY_EMOJIS}
             />
           </View>
