@@ -370,6 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    marginBottom: 100,
   },
   emptyText: {
     fontSize: 16,

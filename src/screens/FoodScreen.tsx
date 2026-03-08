@@ -4,21 +4,21 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import {
-    deleteFoodEntry,
-    ExerciseEntryRow,
-    FoodEntryRow,
-    getExerciseEntries,
-    getFoodEntries,
-    getUserSettings,
-    UserSettings,
+  deleteFoodEntry,
+  ExerciseEntryRow,
+  FoodEntryRow,
+  getExerciseEntries,
+  getFoodEntries,
+  getUserSettings,
+  UserSettings,
 } from '../db/database';
 import { calculateDailyCalories, calculateDailyMacros, calculateNetCalories } from '../features/food/calorieUtils';
 import { calculateAge, calculateBMR, calculateTDEE, validateMeasurement } from '../features/settings/settingsUtils';
@@ -293,6 +293,7 @@ const styles = StyleSheet.create({
   },
   entriesContainer: {
     padding: 24,
+    marginBottom: 100,
   },
   sectionTitle: {
     fontSize: 20,
