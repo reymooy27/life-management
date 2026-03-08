@@ -4,26 +4,26 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import ExpensePieChart from '../components/ExpensePieChart';
 import YearlyBarChart from '../components/YearlyBarChart';
 import {
-    deleteExpense,
-    ExpenseEntryRow,
-    getMonthlyExpenses,
-    getYearlyExpenses,
+  deleteExpense,
+  ExpenseEntryRow,
+  getMonthlyExpenses,
+  getYearlyExpenses,
 } from '../db/database';
 import {
-    calculateMonthlyTotal,
-    EXPENSE_CATEGORIES,
-    groupByCategory,
-    PAYMENT_METHODS,
+  calculateMonthlyTotal,
+  EXPENSE_CATEGORIES,
+  groupByCategory,
+  PAYMENT_METHODS,
 } from '../features/finance/financeUtils';
 import { RootStackParamList } from '../types/navigation';
 import { formatIDR } from '../utils/currency';
@@ -34,12 +34,6 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   Bills: '📄',
   Entertainment: '🎬',
   Other: '📦',
-};
-
-const PAYMENT_EMOJIS: Record<string, string> = {
-  Cash: '💵',
-  Debit: '💳',
-  Credit: '🏦',
 };
 
 function getYearMonth(date: Date): string {
@@ -188,7 +182,6 @@ export default function FinanceScreen() {
             <Text style={styles.sectionTitle}>Spending Breakdown</Text>
             <ExpensePieChart
               data={categoryBreakdown}
-              categoryEmojis={CATEGORY_EMOJIS}
             />
           </View>
         )}
@@ -241,7 +234,7 @@ export default function FinanceScreen() {
                       filterCategory === cat && styles.filterChipTextActive,
                     ]}
                   >
-                    {cat === 'All' ? '🏷️ All' : `${CATEGORY_EMOJIS[cat]} ${cat}`}
+                    {cat === 'All' ? 'All' : cat}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -263,7 +256,7 @@ export default function FinanceScreen() {
                       filterPayment === method && styles.filterChipTextActive,
                     ]}
                   >
-                    {method === 'All' ? '💳 All' : `${PAYMENT_EMOJIS[method]} ${method}`}
+                    {method === 'All' ? 'All' : method}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -295,13 +288,10 @@ export default function FinanceScreen() {
                 <View style={{ flex: 2 }}>
                   <Text style={styles.rowDesc} numberOfLines={1}>{entry.description}</Text>
                   <Text style={styles.rowMeta}>
-                    {entry.date} · {PAYMENT_EMOJIS[entry.payment_method]} {entry.payment_method}
+                    {entry.date} · {entry.payment_method}
                   </Text>
                 </View>
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={styles.rowCategory}>
-                    {CATEGORY_EMOJIS[entry.category] || '📦'}
-                  </Text>
                   <Text style={styles.rowCategoryText}>{entry.category}</Text>
                 </View>
                 <Text style={[styles.rowAmount, { flex: 1 }]} numberOfLines={1}>

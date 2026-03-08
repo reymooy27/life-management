@@ -9,7 +9,6 @@ interface AllocationData {
 
 interface Props {
   data: AllocationData;
-  categoryEmojis: Record<string, string>;
   radius?: number;
   innerRadius?: number;
 }
@@ -21,7 +20,6 @@ const COLORS = [
 
 export default function ExpensePieChart({
   data,
-  categoryEmojis,
   radius = 80,
   innerRadius = 50
 }: Props) {
@@ -75,7 +73,7 @@ export default function ExpensePieChart({
               <View key={name} style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: COLORS[idx % COLORS.length] }]} />
                 <Text style={styles.legendName} numberOfLines={1}>
-                  {categoryEmojis[name] || '📦'} {name}
+                  {name}
                 </Text>
                 <Text style={[styles.legendPercent, { color: COLORS[idx % COLORS.length] }]}>
                   {percent}%

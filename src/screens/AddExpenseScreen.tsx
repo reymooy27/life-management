@@ -4,50 +4,36 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import {
-    addExpense,
-    addExpenseCategory,
-    addPaymentMethod,
-    CustomCategoryRow,
-    CustomPaymentMethodRow,
-    deleteExpenseCategory,
-    deletePaymentMethod,
-    getExpenseCategories,
-    getPaymentMethods,
-    updateExpenseCategory,
-    updatePaymentMethod,
+  addExpense,
+  addExpenseCategory,
+  addPaymentMethod,
+  CustomCategoryRow,
+  CustomPaymentMethodRow,
+  deleteExpenseCategory,
+  deletePaymentMethod,
+  getExpenseCategories,
+  getPaymentMethods,
+  updateExpenseCategory,
+  updatePaymentMethod,
 } from '../db/database';
 import {
-    EXPENSE_CATEGORIES,
-    ExpenseCategory,
-    PAYMENT_METHODS,
-    PaymentMethod,
-    validateAmountInput,
+  EXPENSE_CATEGORIES,
+  ExpenseCategory,
+  PAYMENT_METHODS,
+  PaymentMethod,
+  validateAmountInput,
 } from '../features/finance/financeUtils';
 import { RootStackParamList } from '../types/navigation';
-
-const CATEGORY_EMOJIS: Record<string, string> = {
-  Food: '🍔',
-  Transport: '🚗',
-  Bills: '📄',
-  Entertainment: '🎬',
-  Other: '📦',
-};
-
-const PAYMENT_EMOJIS: Record<string, string> = {
-  Cash: '💵',
-  Debit: '💳',
-  Credit: '🏦',
-};
 
 export default function AddExpenseScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -285,7 +271,7 @@ export default function AddExpenseScreen() {
               onLongPress={() => handleOpenEditModal('edit_category', cat)}
             >
               <Text style={[styles.chipText, category === cat.name && styles.chipTextActive]}>
-                {CATEGORY_EMOJIS[cat.name] || '📦'} {cat.name}
+                {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
@@ -314,7 +300,7 @@ export default function AddExpenseScreen() {
                   paymentMethod === method.name && styles.chipTextActive,
                 ]}
               >
-                {PAYMENT_EMOJIS[method.name] || '🏦'} {method.name}
+                {method.name}
               </Text>
             </TouchableOpacity>
           ))}
