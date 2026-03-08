@@ -103,7 +103,7 @@ const FEATURES: FeaturePage[] = [
 ];
 
 // Repeat data for infinite loop scrolling
-const LOOP_MULTIPLIER = 100;
+const LOOP_MULTIPLIER = 14; // significantly reduced to avoid VirtualizedList slowness
 const LOOPED_DATA = Array.from({ length: LOOP_MULTIPLIER }, (_, i) =>
   FEATURES.map(f => ({ ...f, key: `${f.key}_${i}` }))
 ).flat();
@@ -178,50 +178,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   const onListLayout = (e: LayoutChangeEvent) => {
     const h = Math.ceil(e.nativeEvent.layout.height);
-    // Debounce: only commit height after layout stops changing (200ms)
     if (heightTimer.current) clearTimeout(heightTimer.current);
     heightTimer.current = setTimeout(() => {
       setStableHeight(h);
     }, 200);
   };
-
-  const onScrollBeginDrag = useCallback(() => {
-    dragStartPageRef.current = currentPageRef.current;
-  }, []);
-
-  const onScrollEndDrag = useCallback((e: any) => {
-    if (stableHeight <= 0) return;
-    const offsetY = e.nativeEvent.contentOffset.y;
-    const velocity = e.nativeEvent.velocity?.y ?? 0;
-    const startPage = dragStartPageRef.current;
-    const currentOffset = startPage * stableHeight;
-    const delta = offsetY - currentOffset;
-
-    let targetPage = startPage;
-    // Need to drag at least 30% of a page OR flick with real velocity to change page
-    if (delta > stableHeight * 0.3 || velocity > 0.8) {
-      targetPage = startPage + 1;
-    } else if (delta < -stableHeight * 0.3 || velocity < -0.8) {
-      targetPage = startPage - 1;
-    }
-
-    // Clamp to valid range
-    targetPage = Math.max(0, Math.min(targetPage, LOOPED_DATA.length - 1));
-    currentPageRef.current = targetPage;
-    flatListRef.current?.scrollToIndex({
-      index: targetPage,
-      animated: true,
-    });
-  }, [stableHeight]);
-
-  const onMomentumScrollEnd = useCallback(() => {
-    // Correct final position after any remaining momentum
-    if (stableHeight <= 0) return;
-    flatListRef.current?.scrollToIndex({
-      index: currentPageRef.current,
-      animated: false,
-    });
-  }, [stableHeight]);
 
   const getDashboard = (featureKey: string) => {
     switch (featureKey) {
@@ -432,11 +393,10 @@ export default function HomeScreen({ navigation }: Props) {
             renderItem={renderItem}
             keyExtractor={item => item.key}
             showsVerticalScrollIndicator={false}
-            decelerationRate={0.993}
+            decelerationRate="fast"
+            snapToInterval={stableHeight}
+            snapToAlignment="start"
             disableIntervalMomentum={true}
-            onScrollBeginDrag={onScrollBeginDrag}
-            onScrollEndDrag={onScrollEndDrag}
-            onMomentumScrollEnd={onMomentumScrollEnd}
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             initialScrollIndex={MIDDLE_START_INDEX}
@@ -446,6 +406,9 @@ export default function HomeScreen({ navigation }: Props) {
               index,
             })}
             extraData={dataLoaded}
+            windowSize={3}
+            maxToRenderPerBatch={3}
+            initialNumToRender={3}
           />
         )}
       </View>
