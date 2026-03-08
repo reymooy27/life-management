@@ -195,6 +195,15 @@ async function initializeTables(database: SQLite.SQLiteDatabase): Promise<void> 
   } catch {
     // Columns already exist — ignore
   }
+
+  // Migration: add home_layout column
+  try {
+    await database.runAsync(
+      "ALTER TABLE user_settings ADD COLUMN home_layout TEXT"
+    );
+  } catch {
+    // Column already exists — ignore
+  }
 }
 
 // ── Food CRUD ──
@@ -400,6 +409,7 @@ export interface UserSettings {
   water_notif_interval_hours?: number;
   exercise_morning_notif_enabled?: number;
   exercise_afternoon_notif_enabled?: number;
+  home_layout?: string | null;
 }
 
 export async function getUserSettings(): Promise<UserSettings | null> {
@@ -417,9 +427,9 @@ export async function saveUserSettings(
   await database.runAsync(
     `INSERT OR REPLACE INTO user_settings (
        id, weight_kg, height_cm, birthdate, gender, activity_level, water_goal_ml,
-       water_notif_enabled, water_notif_interval_hours, exercise_morning_notif_enabled, exercise_afternoon_notif_enabled
+       water_notif_enabled, water_notif_interval_hours, exercise_morning_notif_enabled, exercise_afternoon_notif_enabled, home_layout
      )
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       settings.weight_kg ?? null,
       settings.height_cm ?? null,
@@ -431,6 +441,7 @@ export async function saveUserSettings(
       settings.water_notif_interval_hours ?? 2,
       settings.exercise_morning_notif_enabled ?? 0,
       settings.exercise_afternoon_notif_enabled ?? 0,
+      settings.home_layout ?? null,
     ]
   );
 }

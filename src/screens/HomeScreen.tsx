@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
 import {
   Dimensions,
   FlatList,
   LayoutChangeEvent,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,6 +29,7 @@ import {
   getPortfolioEntries,
   getUserSettings,
   getWaterEntries,
+  saveUserSettings,
 } from '../db/database';
 import { calculateMonthlyTotal, groupByCategory } from '../features/finance/financeUtils';
 import { calculateDailyCalories } from '../features/food/calorieUtils';
@@ -105,14 +107,14 @@ const FEATURES: FeaturePage[] = [
 
 // Repeat data for infinite loop scrolling
 const LOOP_MULTIPLIER = 14; // significantly reduced to avoid VirtualizedList slowness
-const LOOPED_DATA = Array.from({ length: LOOP_MULTIPLIER }, (_, i) =>
-  FEATURES.map(f => ({ ...f, key: `${f.key}_${i}` }))
-).flat();
 const MIDDLE_START_INDEX = Math.floor(LOOP_MULTIPLIER / 2) * FEATURES.length;
 
 export default function HomeScreen({ navigation }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [layoutDraft, setLayoutDraft] = useState<string[]>([]);
 
   // Height: debounce onLayout — wait for height to stabilize before committing
   const heightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +139,51 @@ export default function HomeScreen({ navigation }: Props) {
 
   // Gate viewability: ignore events for first 600ms after mount
   const mountTime = useRef(Date.now());
+
+  const orderedFeatures = useMemo(() => {
+    let keys = ['food', 'exercise', 'finance', 'water', 'portfolio'];
+    if (userSettings?.home_layout) {
+      try {
+        const parsed = JSON.parse(userSettings.home_layout);
+        if (Array.isArray(parsed) && parsed.length === FEATURES.length) {
+          keys = parsed;
+        }
+      } catch (e) {}
+    }
+    return keys.map(k => FEATURES.find((f: FeaturePage) => f.key === k)).filter((item): item is FeaturePage => item !== undefined);
+  }, [userSettings?.home_layout]);
+
+  const loopedData = useMemo(() => {
+    return Array.from({ length: LOOP_MULTIPLIER }, (_, i) =>
+      orderedFeatures.map((f: FeaturePage) => ({ ...f, key: `${f.key}_${i}` }))
+    ).flat();
+  }, [orderedFeatures]);
+
+  const openLayoutModal = () => {
+    setLayoutDraft(orderedFeatures.map(f => f.key));
+    setIsModalVisible(true);
+  };
+
+  const moveItem = (index: number, direction: -1 | 1) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= layoutDraft.length) return;
+    const newDraft = [...layoutDraft];
+    const temp = newDraft[index];
+    newDraft[index] = newDraft[newIndex];
+    newDraft[newIndex] = temp;
+    setLayoutDraft(newDraft);
+  };
+
+  const saveLayout = async () => {
+    if (userSettings) {
+      await saveUserSettings({
+        ...userSettings,
+        home_layout: JSON.stringify(layoutDraft),
+      });
+    }
+    setIsModalVisible(false);
+    loadDashboardData();
+  };
 
   const loadDashboardData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -173,7 +220,7 @@ export default function HomeScreen({ navigation }: Props) {
       // Ignore viewability events during initial mount/positioning
       if (Date.now() - mountTime.current < 600) return;
       if (viewableItems.length > 0 && viewableItems[0].index != null) {
-        setActiveIndex(viewableItems[0].index % FEATURES.length);
+        setActiveIndex(viewableItems[0].index % orderedFeatures.length);
       }
     }
   ).current;
@@ -242,9 +289,6 @@ export default function HomeScreen({ navigation }: Props) {
               <View style={{ }}>
                 <ExpensePieChart
                   data={catBreakdown}
-                  categoryEmojis={EMOJIS}
-                  radius={60}
-                  innerRadius={45}
                 />
               </View>
             )}
@@ -354,6 +398,9 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Settings Button */}
       <View style={styles.settingsHeaderContainer}>
+        <TouchableOpacity onPress={openLayoutModal}>
+          <Ionicons name="options-outline" size={28} color="#666" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
           <Ionicons name="settings-outline" size={28} color="#666" />
         </TouchableOpacity>
@@ -382,7 +429,7 @@ export default function HomeScreen({ navigation }: Props) {
             dx < -80 &&
             Math.abs(dx) > Math.abs(dy) * 3
           ) {
-            const feature = FEATURES[activeIndex];
+            const feature = orderedFeatures[activeIndex];
             if (feature) {
               navigation.navigate(feature.route);
             }
@@ -392,7 +439,7 @@ export default function HomeScreen({ navigation }: Props) {
         {stableHeight > 0 && (
           <FlatList
             ref={flatListRef}
-            data={LOOPED_DATA}
+            data={loopedData}
             renderItem={renderItem}
             keyExtractor={item => item.key}
             showsVerticalScrollIndicator={false}
@@ -416,6 +463,42 @@ export default function HomeScreen({ navigation }: Props) {
         )}
       </View>
 
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <SafeAreaView style={styles.modalBg}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Reorder Sections</Text>
+            {layoutDraft.map((key, index) => {
+              const feature = FEATURES.find(f => f.key === key);
+              if (!feature) return null;
+              return (
+                <View key={key} style={styles.sortableRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Ionicons name={feature.icon} size={24} color={feature.accentColor} style={{ marginRight: 12 }} />
+                    <Text style={styles.sortableText}>{feature.title}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity onPress={() => moveItem(index, -1)} disabled={index === 0}>
+                      <Ionicons name="chevron-up" size={28} color={index === 0 ? "#444" : "#FFB74D"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => moveItem(index, 1)} disabled={index === layoutDraft.length - 1}>
+                      <Ionicons name="chevron-down" size={28} color={index === layoutDraft.length - 1 ? "#444" : "#FFB74D"} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setIsModalVisible(false)}>
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={saveLayout}>
+                <Text style={[styles.modalBtnText, { color: '#000' }]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <StatusBar style="light" />
     </SafeAreaView>
   );
@@ -431,6 +514,8 @@ const styles = StyleSheet.create({
     top: 50,
     right: 24,
     zIndex: 10,
+    flexDirection: 'row',
+    gap: 16,
   },
   header: {
     paddingHorizontal: 24,
@@ -579,5 +664,63 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#555',
     letterSpacing: 0.5,
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  sortableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#121212',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  sortableText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalCancel: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#333',
+    alignItems: 'center',
+  },
+  modalSave: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFB74D',
+    alignItems: 'center',
+  },
+  modalBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
