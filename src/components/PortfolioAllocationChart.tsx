@@ -9,6 +9,7 @@ interface AllocationData {
 
 interface Props {
   data: AllocationData;
+  totalFormatted: string;
 }
 
 const COLORS = [
@@ -17,7 +18,7 @@ const COLORS = [
   '#795548', '#607D8B', '#F44336', '#009688', '#CDDC39',
 ];
 
-export default function PortfolioAllocationChart({ data }: Props) {
+export default function PortfolioAllocationChart({ data, totalFormatted }: Props) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
   if (entries.length === 0) return null;
 
@@ -34,12 +35,12 @@ export default function PortfolioAllocationChart({ data }: Props) {
     name,
   }));
 
-  // Center label: total value
+  // Center label: dynamic total string
   const centerLabel = () => (
     <View style={styles.centerLabel}>
       <Text style={styles.centerLabelTitle}>Total</Text>
       <Text style={styles.centerLabelValue} numberOfLines={1} adjustsFontSizeToFit>
-        {formatUSD(total)}
+        {totalFormatted}
       </Text>
     </View>
   );

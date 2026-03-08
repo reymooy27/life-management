@@ -81,6 +81,7 @@ export function calculateTotalInvested(
 
 /**
  * Group entries by ticker and sum current values.
+ * (WARNING: Returns mixed currencies if IDR and USD are present.)
  */
 export function groupByAsset(
   entries: Pick<PortfolioEntryRow, 'ticker' | 'current_price' | 'quantity'>[]
@@ -89,6 +90,24 @@ export function groupByAsset(
   for (const e of entries) {
     const ticker = e.ticker.toUpperCase();
     groups[ticker] = (groups[ticker] || 0) + e.current_price * e.quantity;
+  }
+  return groups;
+}
+
+/**
+ * Group entries by ticker and sum current values normalized to USD.
+ * This ensures percentages in Pie Charts are accurate globally.
+ */
+export function groupByAssetUsdContext(
+  entries: Pick<PortfolioEntryRow, 'ticker' | 'current_price' | 'quantity' | 'asset_type'>[],
+  usdToIdr: number
+): Record<string, number> {
+  const groups: Record<string, number> = {};
+  for (const e of entries) {
+    const ticker = e.ticker.toUpperCase();
+    const rawValue = e.current_price * e.quantity;
+    const normalizedValue = isIdrAsset(e) ? rawValue / usdToIdr : rawValue;
+    groups[ticker] = (groups[ticker] || 0) + normalizedValue;
   }
   return groups;
 }

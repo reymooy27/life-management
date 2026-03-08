@@ -30,8 +30,9 @@ import {
   calculateTotalInvestedUsd,
   calculateTotalPortfolioValueUsd,
   formatAssetCurrency,
-  groupByAsset,
+  groupByAssetUsdContext,
   groupHoldings,
+  isIdrAsset,
 } from '../features/portfolio/portfolioUtils';
 import { fetchAllPrices, fetchUsdToIdrRate } from '../features/portfolio/priceService';
 import { RootStackParamList } from '../types/navigation';
@@ -47,6 +48,8 @@ const ASSET_TYPE_ICONS: Record<string, { icon: keyof typeof Ionicons.glyphMap; c
 };
 
 type DisplayCurrency = 'USD' | 'IDR';
+type SortOption = 'value' | 'pnl' | 'invested';
+type FilterOption = 'all' | 'crypto' | 'stock' | 'gold' | 'custom';
 
 export default function PortfolioScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -54,8 +57,21 @@ export default function PortfolioScreen() {
   const [snapshots, setSnapshots] = useState<PortfolioSnapshotRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('USD');
+  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('IDR');
   const [usdToIdr, setUsdToIdr] = useState(16000);
+
+  const [sortBy, setSortBy] = useState<SortOption>('value');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterType, setFilterType] = useState<FilterOption>('all');
+
+  const handleSortPress = (type: SortOption) => {
+    if (sortBy === type) {
+      setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSortBy(type);
+      setSortOrder('desc'); // default to descending for new sort metric
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -142,8 +158,38 @@ export default function PortfolioScreen() {
     return formatUSD(usdAmount);
   };
 
-  const allocation = groupByAsset(entries);
-  const groupedHoldings = groupHoldings(entries);
+  const allocation = groupByAssetUsdContext(entries, usdToIdr);
+
+  // Apply filtering and sorting
+  let groupedHoldings = groupHoldings(entries);
+
+  if (filterType !== 'all') {
+    groupedHoldings = groupedHoldings.filter(g => g.asset_type.toLowerCase() === filterType);
+  }
+
+  groupedHoldings.sort((a, b) => {
+    // Normalize to USD for math-perfect sorting
+    const aVal = isIdrAsset(a) ? a.total_value / usdToIdr : a.total_value;
+    const bVal = isIdrAsset(b) ? b.total_value / usdToIdr : b.total_value;
+    
+    const aInv = isIdrAsset(a) ? a.total_invested / usdToIdr : a.total_invested;
+    const bInv = isIdrAsset(b) ? b.total_invested / usdToIdr : b.total_invested;
+
+    let result = 0;
+    if (sortBy === 'value') {
+      result = aVal - bVal;
+    } else if (sortBy === 'invested') {
+      result = aInv - bInv;
+    } else if (sortBy === 'pnl') {
+      const pnlA = aVal - aInv;
+      const pnlB = bVal - bInv;
+      const pctA = aInv > 0 ? (pnlA / aInv) * 100 : 0;
+      const pctB = bInv > 0 ? (pnlB / bInv) * 100 : 0;
+      result = pctA - pctB;
+    }
+    
+    return sortOrder === 'desc' ? -result : result;
+  });
 
   // Chart data
   let chartData = snapshots.map(s => ({
@@ -168,7 +214,7 @@ export default function PortfolioScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -182,19 +228,19 @@ export default function PortfolioScreen() {
         {/* Currency Toggle */}
         <View style={styles.toggleRow}>
           <TouchableOpacity
-            style={[styles.toggleBtn, displayCurrency === 'USD' && styles.toggleBtnActive]}
-            onPress={() => setDisplayCurrency('USD')}
-          >
-            <Text style={[styles.toggleText, displayCurrency === 'USD' && styles.toggleTextActive]}>
-              USD
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.toggleBtn, displayCurrency === 'IDR' && styles.toggleBtnActive]}
             onPress={() => setDisplayCurrency('IDR')}
           >
             <Text style={[styles.toggleText, displayCurrency === 'IDR' && styles.toggleTextActive]}>
               IDR
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, displayCurrency === 'USD' && styles.toggleBtnActive]}
+            onPress={() => setDisplayCurrency('USD')}
+          >
+            <Text style={[styles.toggleText, displayCurrency === 'USD' && styles.toggleTextActive]}>
+              USD
             </Text>
           </TouchableOpacity>
           <Text style={styles.rateText}>1 USD = {formatIDR(usdToIdr)}</Text>
@@ -280,13 +326,58 @@ export default function PortfolioScreen() {
         {Object.keys(allocation).length > 0 && (
           <View style={styles.chartContainer}>
             <Text style={styles.sectionTitle}>Allocation</Text>
-            <PortfolioAllocationChart data={allocation} />
+            <PortfolioAllocationChart
+              data={allocation}
+              totalFormatted={formatTotal(totalValueUsd)}
+            />
           </View>
         )}
 
         {/* Holdings List */}
         <View style={styles.listContainer}>
           <Text style={styles.sectionTitle}>Holdings</Text>
+
+          {/* Controls: Filter & Sort */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.controlsScroll}>
+            <TouchableOpacity
+              style={[styles.controlBtn, sortBy === 'value' && styles.controlBtnActive]}
+              onPress={() => handleSortPress('value')}
+            >
+              <Text style={[styles.controlText, sortBy === 'value' && styles.controlTextActive]}>
+                Sort: Value {sortBy === 'value' ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlBtn, sortBy === 'pnl' && styles.controlBtnActive]}
+              onPress={() => handleSortPress('pnl')}
+            >
+              <Text style={[styles.controlText, sortBy === 'pnl' && styles.controlTextActive]}>
+                Sort: PnL {sortBy === 'pnl' ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlBtn, sortBy === 'invested' && styles.controlBtnActive]}
+              onPress={() => handleSortPress('invested')}
+            >
+              <Text style={[styles.controlText, sortBy === 'invested' && styles.controlTextActive]}>
+                Sort: Invested {sortBy === 'invested' ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.controlDivider} />
+
+            {(['all', 'crypto', 'stock', 'gold', 'custom'] as FilterOption[]).map(cat => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.controlBtn, filterType === cat && styles.controlBtnActive]}
+                onPress={() => setFilterType(cat)}
+              >
+                <Text style={[styles.controlText, filterType === cat && styles.controlTextActive]}>
+                  {cat === 'all' ? 'All Types' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           {groupedHoldings.length === 0 ? (
             <View style={styles.emptyState}>
@@ -303,11 +394,22 @@ export default function PortfolioScreen() {
                 group.total_quantity
               );
               const assetInfo = ASSET_TYPE_ICONS[group.asset_type] || ASSET_TYPE_ICONS.custom;
-              const fmt = (v: number) => formatAssetCurrency(v, group);
-              
+
+              // Dynamic format function that respects displayCurrency toggle
+              const fmt = (v: number) => {
+                const isIdr = isIdrAsset(group);
+                if (displayCurrency === 'IDR') {
+                  // Converting USD asset to IDR visually
+                  return isIdr ? formatIDR(v) : formatIDR(v * usdToIdr);
+                } else {
+                  // Converting IDR asset to USD visually
+                  return isIdr ? formatUSD(v / usdToIdr) : formatUSD(v);
+                }
+              };
+
               // We don't have individual entry ids here, but we use the composite key for the mapped key
               const groupKey = `${group.asset_type}-${group.ticker}`;
-              
+
               return (
                 <TouchableOpacity
                   key={groupKey}
@@ -335,7 +437,7 @@ export default function PortfolioScreen() {
                           Invested: {fmt(group.total_invested)}
                         </Text>
                       </View>
-                      
+
                       {/* Right: Current Value Total Colored */}
                       <View style={styles.holdingPnlCol}>
                         <Text
@@ -367,7 +469,7 @@ export default function PortfolioScreen() {
                       </View>
                       <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>Current</Text>
-                        <Text style={[styles.detailValue, { color: '#4CAF50' }]}>
+                        <Text style={[styles.detailValue]}>
                           {group.current_price > 0 ? fmt(group.current_price) : '—'}
                         </Text>
                       </View>
@@ -498,16 +600,50 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#333',
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#e0e0e0',
-    marginBottom: 12,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  controlsScroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  controlBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+    backgroundColor: '#1a1a1a',
+  },
+  controlBtnActive: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  controlText: {
+    fontSize: 12,
+    color: '#aaa',
+    fontWeight: '500',
+  },
+  controlTextActive: {
+    color: '#000',
+    fontWeight: 'bold',
+  },
+  controlDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#333',
+    marginHorizontal: 4,
   },
   listContainer: {
-    padding: 16,
-    paddingTop: 0,
+    paddingBottom: 20,
+    padding: 16
   },
   emptyState: {
     padding: 32,

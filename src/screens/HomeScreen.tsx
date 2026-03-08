@@ -35,8 +35,9 @@ import {
   calculateTotalInvestedUsd,
   calculateTotalPortfolioValueUsd,
 } from '../features/portfolio/portfolioUtils';
+import { fetchUsdToIdrRate } from '../features/portfolio/priceService';
 import { RootStackParamList } from '../types/navigation';
-import { formatIDR, formatUSD } from '../utils/currency';
+import { formatUSD } from '../utils/currency';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -132,6 +133,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [portfolioEntries, setPortfolioEntries] = useState<PortfolioEntryRow[]>([]);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [usdToIdrRate, setUsdToIdrRate] = useState(16000);
 
   // Gate viewability: ignore events for first 600ms after mount
   const mountTime = useRef(Date.now());
@@ -139,20 +141,24 @@ export default function HomeScreen({ navigation }: Props) {
   const loadDashboardData = useCallback(async () => {
     const today = new Date().toISOString().split('T')[0];
     const yearMonth = today.substring(0, 7);
-    const [food, exercise, expenses, water, settings, portfolio] = await Promise.all([
+    const [food, exercise, expenses, water, settings, portfolio, exchangeRate] = await Promise.all([
       getFoodEntries(today),
       getExerciseEntries(today),
       getMonthlyExpenses(yearMonth),
       getWaterEntries(today),
       getUserSettings(),
       getPortfolioEntries(),
+      fetchUsdToIdrRate(),
     ]);
     setFoodEntries(food);
     setExerciseEntries(exercise);
     setMonthlyExpenses(expenses);
     setWaterEntries(water);
-    setUserSettings(settings);
     setPortfolioEntries(portfolio);
+    setUserSettings(settings);
+
+    // Store localized exchange rate to sync Portfolio totals accurately
+    setUsdToIdrRate(exchangeRate);
     setDataLoaded(true);
   }, []);
 
@@ -266,31 +272,28 @@ export default function HomeScreen({ navigation }: Props) {
         );
       }
       case 'portfolio': {
-        const rate = 16000; // fallback rate for home dashboard
-        const totalValue = calculateTotalPortfolioValueUsd(portfolioEntries, rate);
-        const totalInvested = calculateTotalInvestedUsd(portfolioEntries, rate);
-        const pnl = totalValue - totalInvested;
-        const holdingCount = portfolioEntries.length;
+        const totalInvested = calculateTotalInvestedUsd(portfolioEntries, usdToIdrRate);
+        const totalValue = calculateTotalPortfolioValueUsd(portfolioEntries, usdToIdrRate);
+        const totalPnl = totalValue - totalInvested;
+        const pnlPercent = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
         return (
           <View style={styles.dashboardCard}>
             <View style={styles.dashRow}>
-              <View style={styles.dashItem}>
-                <Text style={[styles.dashValue, { color: '#4CAF50' }]}>
-                  {holdingCount > 0 ? formatUSD(totalValue) : '—'}
-                </Text>
+              {/* <View style={styles.dashItem}>
+                <Text style={[styles.dashValue, { color: '#4CAF50' }]}>{formatUSD(totalValue)}</Text>
                 <Text style={styles.dashLabel}>portfolio value</Text>
-              </View>
-              <View style={styles.dashDivider} />
+              </View> */}
+              {/* <View style={styles.dashDivider} /> */}
               <View style={styles.dashItem}>
                 <Text
                   style={[
                     styles.dashValue,
-                    { color: pnl >= 0 ? '#4CAF50' : '#CF6679' },
+                    { color: totalPnl >= 0 ? '#4CAF50' : '#CF6679' },
                   ]}
                 >
-                  {holdingCount > 0 ? `${pnl >= 0 ? '+' : ''}${formatUSD(pnl)}` : '—'}
+                  {totalPnl >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
                 </Text>
-                <Text style={styles.dashLabel}>total pnl</Text>
+                <Text style={styles.dashLabel}>total return</Text>
               </View>
             </View>
           </View>
