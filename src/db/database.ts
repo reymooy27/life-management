@@ -214,10 +214,10 @@ export interface FoodEntryRow {
 export async function addFoodEntry(
   name: string,
   calories: number,
-  category: string,
-  protein: number,
-  carbs: number,
-  fats: number,
+  category: string = 'Snack',
+  protein: number = 0,
+  carbs: number = 0,
+  fats: number = 0,
   date: string,
   time: string
 ): Promise<void> {
@@ -225,6 +225,22 @@ export async function addFoodEntry(
   await database.runAsync(
     'INSERT INTO food_entries (name, calories, category, protein, carbs, fats, date, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [name, calories, category, protein, carbs, fats, date, time]
+  );
+}
+
+export async function updateFoodEntry(
+  id: number,
+  name: string,
+  calories: number,
+  category: string,
+  protein: number,
+  carbs: number,
+  fats: number
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE food_entries SET name = ?, calories = ?, category = ?, protein = ?, carbs = ?, fats = ? WHERE id = ?',
+    [name, calories, category, protein, carbs, fats, id]
   );
 }
 
@@ -275,6 +291,19 @@ export async function addExerciseEntry(
   );
 }
 
+export async function updateExerciseEntry(
+  id: number,
+  name: string,
+  durationMinutes: number,
+  caloriesBurned: number
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE exercise_entries SET name = ?, duration_minutes = ?, calories_burned = ? WHERE id = ?',
+    [name, durationMinutes, caloriesBurned, id]
+  );
+}
+
 export async function getExerciseEntries(date: string): Promise<ExerciseEntryRow[]> {
   const database = await getDatabase();
   return await database.getAllAsync<ExerciseEntryRow>(
@@ -310,6 +339,20 @@ export async function addExpense(
   await database.runAsync(
     'INSERT INTO expense_entries (description, amount, category, date, payment_method) VALUES (?, ?, ?, ?, ?)',
     [description, amount, category, date, paymentMethod]
+  );
+}
+
+export async function updateExpense(
+  id: number,
+  description: string,
+  amount: number,
+  category: string,
+  paymentMethod: string
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE expense_entries SET description = ?, amount = ?, category = ?, payment_method = ? WHERE id = ?',
+    [description, amount, category, paymentMethod, id]
   );
 }
 
@@ -559,6 +602,20 @@ export async function addPortfolioEntry(
   await database.runAsync(
     'INSERT INTO portfolio_entries (asset_name, ticker, asset_type, buy_price, quantity, date_added, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [assetName, ticker.toUpperCase(), assetType, buyPrice, quantity, dateAdded, notes]
+  );
+}
+
+export async function updatePortfolioEntry(
+  id: number,
+  buyPrice: number,
+  quantity: number,
+  dateAdded: string,
+  notes: string
+): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    'UPDATE portfolio_entries SET buy_price = ?, quantity = ?, date_added = ?, notes = ? WHERE id = ?',
+    [buyPrice, quantity, dateAdded, notes, id]
   );
 }
 

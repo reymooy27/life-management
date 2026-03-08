@@ -10,15 +10,21 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { addExerciseEntry } from '../db/database';
+import { addExerciseEntry, updateExerciseEntry } from '../db/database';
 import { validateCalorieInput } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
+import { RouteProp, useRoute } from '@react-navigation/native';
+
+type AddExerciseScreenRouteProp = RouteProp<RootStackParamList, 'AddExercise'>;
 
 export default function AddExerciseScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [exerciseName, setExerciseName] = useState('');
-  const [duration, setDuration] = useState('');
-  const [caloriesBurned, setCaloriesBurned] = useState('');
+  const route = useRoute<AddExerciseScreenRouteProp>();
+  const editEntry = route.params?.editEntry;
+
+  const [exerciseName, setExerciseName] = useState(editEntry?.name || '');
+  const [duration, setDuration] = useState(editEntry ? String(editEntry.duration_minutes) : '');
+  const [caloriesBurned, setCaloriesBurned] = useState(editEntry ? String(editEntry.calories_burned) : '');
   const [error, setError] = useState('');
 
   const handleAdd = async () => {
@@ -37,12 +43,18 @@ export default function AddExerciseScreen() {
       return;
     }
     setError('');
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    await addExerciseEntry(exerciseName.trim(), dur, cal, today, time);
+    
+    if (editEntry) {
+      await updateExerciseEntry(editEntry.id, exerciseName.trim(), dur, cal);
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      const time = new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      await addExerciseEntry(exerciseName.trim(), dur, cal, today, time);
+    }
+    
     navigation.goBack();
   };
 
@@ -90,8 +102,10 @@ export default function AddExerciseScreen() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
-          <Ionicons name="add-circle" size={22} color="#000" />
-          <Text style={styles.submitButtonText}>Add Exercise Entry</Text>
+          <Ionicons name={editEntry ? "save" : "add-circle"} size={22} color="#000" />
+          <Text style={styles.submitButtonText}>
+            {editEntry ? "Save Changes" : "Add Exercise Entry"}
+          </Text>
         </TouchableOpacity>
       </View>
 

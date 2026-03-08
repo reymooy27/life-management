@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Alert,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +17,9 @@ import YearlyBarChart from '../components/YearlyBarChart';
 import {
   deleteExpense,
   ExpenseEntryRow,
+  getExpenseCategories,
   getMonthlyExpenses,
+  getPaymentMethods,
   getYearlyExpenses,
 } from '../db/database';
 import {
@@ -60,9 +63,39 @@ export default function FinanceScreen() {
   const [yearlyExpenses, setYearlyExpenses] = useState<ExpenseEntryRow[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const swipeRefs = useRef<{ [key: number]: ScrollView | null }>({});
+  const activeSwipeId = useRef<number | null>(null);
+
+  const handleScrollBeginDrag = (id: number) => {
+    if (activeSwipeId.current !== null && activeSwipeId.current !== id) {
+      swipeRefs.current[activeSwipeId.current]?.scrollTo({ x: 0, animated: true });
+    }
+    activeSwipeId.current = id;
+  };
+
   // Filters
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterPayment, setFilterPayment] = useState<string>('All');
+  const [categories, setCategories] = useState<string[]>([...EXPENSE_CATEGORIES]);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([...PAYMENT_METHODS]);
+
+  // Load categories and payment methods
+  useEffect(() => {
+    let isCurrent = true;
+    (async () => {
+      try {
+        const cats = await getExpenseCategories();
+        const methods = await getPaymentMethods();
+        if (isCurrent) {
+          setCategories(cats.length > 0 ? cats.map(c => c.name) : [...EXPENSE_CATEGORIES]);
+          setPaymentMethods(methods.length > 0 ? methods.map(m => m.name) : [...PAYMENT_METHODS]);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => { isCurrent = false; };
+  }, [refreshKey]);
 
   // Load monthly expenses
   useEffect(() => {
@@ -142,6 +175,8 @@ export default function FinanceScreen() {
     });
   }, [expenses, filterCategory, filterPayment]);
 
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+
   return (
     <View style={styles.container}>
       <ScrollView keyboardShouldPersistTaps="handled">
@@ -219,7 +254,7 @@ export default function FinanceScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterScroll}
             >
-              {['All', ...EXPENSE_CATEGORIES].map(cat => (
+              {['All', ...categories].map(cat => (
                 <TouchableOpacity
                   key={`fc-${cat}`}
                   style={[
@@ -241,7 +276,7 @@ export default function FinanceScreen() {
 
               <View style={styles.filterSpacer} />
 
-              {['All', ...PAYMENT_METHODS].map(method => (
+              {['All', ...paymentMethods].map(method => (
                 <TouchableOpacity
                   key={`fp-${method}`}
                   style={[
@@ -281,28 +316,53 @@ export default function FinanceScreen() {
             </View>
           ) : (
             filteredExpenses.map((entry, idx) => (
-              <View
-                key={entry.id}
-                style={[styles.tableRow, idx % 2 === 0 && styles.tableRowAlt]}
-              >
-                <View style={{ flex: 2 }}>
-                  <Text style={styles.rowDesc} numberOfLines={1}>{entry.description}</Text>
-                  <Text style={styles.rowMeta}>
-                    {entry.date} · {entry.payment_method}
-                  </Text>
-                </View>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={styles.rowCategoryText}>{entry.category}</Text>
-                </View>
-                <Text style={[styles.rowAmount, { flex: 1 }]} numberOfLines={1}>
-                  {formatIDR(entry.amount)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => confirmDelete(entry.id, entry.description)}
+              <View key={entry.id} style={styles.swipeContainer}>
+                <ScrollView
+                  ref={(el) => { swipeRefs.current[entry.id] = el; }}
+                  onScrollBeginDrag={() => handleScrollBeginDrag(entry.id)}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={SCREEN_WIDTH - 32}
+                  decelerationRate="fast"
+                  contentContainerStyle={{ width: (SCREEN_WIDTH - 32) + 120, flexDirection: 'row' }}
                 >
-                  <Ionicons name="close" size={14} color="#CF6679" />
-                </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.tableRow, 
+                      idx % 2 === 0 && styles.tableRowAlt, 
+                      { width: SCREEN_WIDTH - 32 }
+                    ]}
+                  >
+                    <View style={{ flex: 2 }}>
+                      <Text style={styles.rowDesc} numberOfLines={1}>{entry.description}</Text>
+                      <Text style={styles.rowMeta}>
+                        {entry.date} · {entry.payment_method}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <Text style={styles.rowCategoryText}>{entry.category}</Text>
+                    </View>
+                    <Text style={[styles.rowAmount, { flex: 1 }]} numberOfLines={1}>
+                      {formatIDR(entry.amount)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.actionMenu}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#333' }]}
+                      onPress={() => navigation.navigate('AddExpense', { editEntry: entry })}
+                    >
+                      <Ionicons name="pencil" size={20} color="#FFB74D" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: '#CF6679' }]}
+                      onPress={() => confirmDelete(entry.id, entry.description)}
+                    >
+                      <Ionicons name="trash" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             ))
           )}
@@ -503,14 +563,18 @@ const styles = StyleSheet.create({
     color: '#FFB74D',
     textAlign: 'right',
   },
-  deleteButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#2a2a2a',
-    alignItems: 'center',
+  swipeContainer: {
+    height: 60,
+    overflow: 'hidden',
+  },
+  actionMenu: {
+    width: 120,
+    flexDirection: 'row',
+  },
+  actionBtn: {
+    flex: 1,
     justifyContent: 'center',
-    marginLeft: 8,
+    alignItems: 'center',
   },
   tableFooter: {
     paddingVertical: 12,

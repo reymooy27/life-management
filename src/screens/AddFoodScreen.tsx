@@ -11,19 +11,25 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { addFoodEntry, FoodEntryRow, getRecentFoods } from '../db/database';
+import { addFoodEntry, FoodEntryRow, getRecentFoods, updateFoodEntry } from '../db/database';
 import { FoodItem, searchFoods } from '../features/food/calorieData';
 import { validateCalorieInput } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
+import { RouteProp, useRoute } from '@react-navigation/native';
+
+type AddFoodScreenRouteProp = RouteProp<RootStackParamList, 'AddFood'>;
 
 export default function AddFoodScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [newFoodName, setNewFoodName] = useState('');
-  const [newCalories, setNewCalories] = useState('');
-  const [category, setCategory] = useState('Snack');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fats, setFats] = useState('');
+  const route = useRoute<AddFoodScreenRouteProp>();
+  const editEntry = route.params?.editEntry;
+
+  const [newFoodName, setNewFoodName] = useState(editEntry?.name || '');
+  const [newCalories, setNewCalories] = useState(editEntry ? String(editEntry.calories) : '');
+  const [category, setCategory] = useState(editEntry?.category || 'Snack');
+  const [protein, setProtein] = useState(editEntry ? String(editEntry.protein) : '');
+  const [carbs, setCarbs] = useState(editEntry ? String(editEntry.carbs) : '');
+  const [fats, setFats] = useState(editEntry ? String(editEntry.fats) : '');
 
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
   const [recentFoods, setRecentFoods] = useState<FoodEntryRow[]>([]);
@@ -81,12 +87,18 @@ export default function AddFoodScreen() {
     const f = fats ? validateCalorieInput(fats) || 0 : 0;
 
     setCalorieError('');
-    const today = new Date().toISOString().split('T')[0];
-    const time = new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    await addFoodEntry(newFoodName.trim(), cal, category, p, c, f, today, time);
+    
+    if (editEntry) {
+      await updateFoodEntry(editEntry.id, newFoodName.trim(), cal, category, p, c, f);
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      const time = new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      await addFoodEntry(newFoodName.trim(), cal, category, p, c, f, today, time);
+    }
+    
     navigation.goBack();
   };
 
@@ -222,8 +234,10 @@ export default function AddFoodScreen() {
         {calorieError ? <Text style={styles.errorText}>{calorieError}</Text> : null}
 
         <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
-          <Ionicons name="add-circle" size={22} color="#000" />
-          <Text style={styles.submitButtonText}>Add Food Entry</Text>
+          <Ionicons name={editEntry ? "save" : "add-circle"} size={22} color="#000" />
+          <Text style={styles.submitButtonText}>
+            {editEntry ? "Save Changes" : "Add Food Entry"}
+          </Text>
         </TouchableOpacity>
       </View>
 

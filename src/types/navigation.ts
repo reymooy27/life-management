@@ -3,14 +3,14 @@ export type RootStackParamList = {
   Food: undefined;
   Exercise: undefined;
   Money: undefined;
-  AddFood: undefined;
-  AddExercise: undefined;
-  AddExpense: undefined;
+  AddFood: { editEntry?: any } | undefined;
+  AddExercise: { editEntry?: any } | undefined;
+  AddExpense: { editEntry?: any } | undefined;
   Settings: undefined;
   Water: undefined;
   AddWater: undefined;
   Portfolio: undefined;
-  AddInvestment: undefined;
+  AddInvestment: { editEntry?: any } | undefined;
   AssetTransactions: {
     ticker: string;
     asset_type: string;

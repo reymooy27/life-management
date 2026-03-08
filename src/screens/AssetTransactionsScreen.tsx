@@ -68,12 +68,20 @@ export default function AssetTransactionsScreen() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.dateText}>{item.date_added}</Text>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => confirmDelete(item.id, item.date_added)}
-          >
-            <Ionicons name="trash-outline" size={16} color="#CF6679" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => navigation.navigate('AddInvestment', { editEntry: item })}
+            >
+              <Ionicons name="pencil" size={16} color="#03DAC6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => confirmDelete(item.id, item.date_added)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#CF6679" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.cardBody}>

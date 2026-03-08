@@ -23,6 +23,7 @@ import {
   deletePaymentMethod,
   getExpenseCategories,
   getPaymentMethods,
+  updateExpense,
   updateExpenseCategory,
   updatePaymentMethod,
 } from '../db/database';
@@ -34,15 +35,21 @@ import {
   validateAmountInput,
 } from '../features/finance/financeUtils';
 import { RootStackParamList } from '../types/navigation';
+import { RouteProp, useRoute } from '@react-navigation/native';
+
+type AddExpenseScreenRouteProp = RouteProp<RootStackParamList, 'AddExpense'>;
 
 export default function AddExpenseScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<ExpenseCategory>('Food');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
+  const route = useRoute<AddExpenseScreenRouteProp>();
+  const editEntry = route.params?.editEntry;
+
+  const [description, setDescription] = useState(editEntry?.description || '');
+  const [amount, setAmount] = useState(editEntry ? String(editEntry.amount) : '');
+  const [category, setCategory] = useState<ExpenseCategory | string>(editEntry?.category || 'Food');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | string>(editEntry?.payment_method || 'Cash');
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
+    editEntry?.date || new Date().toISOString().split('T')[0]
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState('');
@@ -183,7 +190,14 @@ export default function AddExpenseScreen() {
       return;
     }
     setError('');
-    await addExpense(description.trim(), amt, category, selectedDate, paymentMethod);
+    
+    if (editEntry) {
+      // NOTE: Our database mutation currently does not update date for expenses
+      await updateExpense(editEntry.id, description.trim(), amt, category as string, paymentMethod as string);
+    } else {
+      await addExpense(description.trim(), amt, category as string, selectedDate, paymentMethod as string);
+    }
+    
     navigation.goBack();
   };
 
@@ -316,8 +330,10 @@ export default function AddExpenseScreen() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
-          <Ionicons name="add-circle" size={22} color="#000" />
-          <Text style={styles.submitButtonText}>Add Expense</Text>
+          <Ionicons name={editEntry ? "save" : "add-circle"} size={22} color="#000" />
+          <Text style={styles.submitButtonText}>
+            {editEntry ? "Save Changes" : "Add Expense"}
+          </Text>
         </TouchableOpacity>
       </View>
 

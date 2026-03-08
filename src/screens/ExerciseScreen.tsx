@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import {
@@ -25,6 +27,16 @@ export default function ExerciseScreen() {
   const [currentMonth, setCurrentMonth] = useState<string>(TODAY.substring(0, 7));
   const [entries, setEntries] = useState<ExerciseEntryRow[]>([]);
 
+  const swipeRefs = useRef<{ [key: number]: ScrollView | null }>({});
+  const activeSwipeId = useRef<number | null>(null);
+
+  const handleScrollBeginDrag = (id: number) => {
+    if (activeSwipeId.current !== null && activeSwipeId.current !== id) {
+      swipeRefs.current[activeSwipeId.current]?.scrollTo({ x: 0, animated: true });
+    }
+    activeSwipeId.current = id;
+  };
+
   const loadEntries = useCallback(async () => {
     const rows = await getExerciseEntries(selectedDate);
     setEntries(rows);
@@ -36,10 +48,29 @@ export default function ExerciseScreen() {
     }, [loadEntries])
   );
 
-  const handleDelete = async (id: number) => {
-    await deleteExerciseEntry(id);
-    await loadEntries();
+  const handleDelete = (id: number) => {
+    Alert.alert(
+      'Delete Exercise',
+      'Are you sure you want to delete this exercise?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            await deleteExerciseEntry(id);
+            loadEntries();
+          }
+        }
+      ]
+    );
   };
+  
+  const handleEdit = (entry: ExerciseEntryRow) => {
+    navigation.navigate('AddExercise', { editEntry: entry });
+  };
+  
+  const SCREEN_WIDTH = Dimensions.get('window').width;
 
   const totalBurned = entries.reduce((s, e) => s + e.calories_burned, 0);
   const totalMinutes = entries.reduce((s, e) => s + e.duration_minutes, 0);
@@ -113,23 +144,46 @@ export default function ExerciseScreen() {
             </View>
           ) : (
             entries.map(entry => (
-              <View key={entry.id} style={styles.entryCard}>
-                <View style={styles.entryIcon}>
-                  <Ionicons name="fitness" size={18} color="#03DAC6" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.entryName}>{entry.name}</Text>
-                  <Text style={styles.entryMeta}>
-                    {entry.time} · {entry.duration_minutes} min ·{' '}
-                    {entry.calories_burned} cal
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(entry.id)}
+              <View key={entry.id} style={styles.swipeContainer}>
+                <ScrollView 
+                   ref={(el) => { swipeRefs.current[entry.id] = el; }}
+                   onScrollBeginDrag={() => handleScrollBeginDrag(entry.id)}
+                   horizontal 
+                   pagingEnabled 
+                   showsHorizontalScrollIndicator={false}
+                   snapToInterval={SCREEN_WIDTH - 48}
+                   decelerationRate="fast"
+                   contentContainerStyle={{ width: (SCREEN_WIDTH - 48) + 120, flexDirection: 'row' }}
                 >
-                  <Ionicons name="close" size={16} color="#CF6679" />
-                </TouchableOpacity>
+                  <View style={[styles.entryCard, { width: SCREEN_WIDTH - 48 }]}>
+                    <View style={styles.entryIcon}>
+                      <Ionicons name="fitness" size={18} color="#03DAC6" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.entryName}>{entry.name}</Text>
+                      <Text style={styles.entryMeta}>
+                        {entry.time} · {entry.duration_minutes} min ·{' '}
+                        {entry.calories_burned} cal
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Inline Action Buttons */}
+                  <View style={styles.actionMenu}>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: '#333' }]}
+                       onPress={() => handleEdit(entry)}
+                     >
+                       <Ionicons name="pencil" size={20} color="#03DAC6" />
+                     </TouchableOpacity>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: '#CF6679' }]}
+                       onPress={() => handleDelete(entry.id)}
+                     >
+                       <Ionicons name="trash" size={20} color="#fff" />
+                     </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             ))
           )}
@@ -210,15 +264,30 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: '#666',
   },
+  swipeContainer: {
+    marginBottom: 12,
+    height: 72,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  actionMenu: {
+    width: 120,
+    flexDirection: 'row',
+  },
+  actionBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   entryCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1e1e1e',
     padding: 16,
     borderRadius: 16,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333',
+    height: '100%',
   },
   entryIcon: {
     width: 40,
@@ -237,14 +306,6 @@ const styles = StyleSheet.create({
   entryMeta: {
     fontSize: 14,
     color: '#888',
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#333',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',

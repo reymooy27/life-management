@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
+  Alert,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +35,16 @@ export default function FoodScreen() {
   const [exerciseEntries, setExerciseEntries] = useState<ExerciseEntryRow[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
 
+  const swipeRefs = useRef<{ [key: number]: ScrollView | null }>({});
+  const activeSwipeId = useRef<number | null>(null);
+
+  const handleScrollBeginDrag = (id: number) => {
+    if (activeSwipeId.current !== null && activeSwipeId.current !== id) {
+      swipeRefs.current[activeSwipeId.current]?.scrollTo({ x: 0, animated: true });
+    }
+    activeSwipeId.current = id;
+  };
+
   const loadEntries = useCallback(async () => {
     const [foodRows, exerciseRows, userSet] = await Promise.all([
       getFoodEntries(selectedDate),
@@ -50,10 +62,29 @@ export default function FoodScreen() {
     }, [loadEntries])
   );
 
-  const handleDelete = async (id: number) => {
-    await deleteFoodEntry(id);
-    await loadEntries();
+  const handleDelete = (id: number) => {
+    Alert.alert(
+      'Delete Meal',
+      'Are you sure you want to delete this meal logged?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            await deleteFoodEntry(id);
+            loadEntries();
+          }
+        }
+      ]
+    );
   };
+  
+  const handleEdit = (entry: FoodEntryRow) => {
+    navigation.navigate('AddFood', { editEntry: entry });
+  };
+  
+  const SCREEN_WIDTH = Dimensions.get('window').width;
 
   const dailyTotal = calculateDailyCalories(entries);
   const dailyMacros = calculateDailyMacros(entries);
@@ -181,28 +212,51 @@ export default function FoodScreen() {
             </View>
           ) : (
             entries.map(entry => (
-              <View key={entry.id} style={styles.entryCard}>
-                <View style={styles.entryIcon}>
-                  <Ionicons name={getCategoryIcon(entry.category)} size={18} color="#BB86FC" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.entryName}>{entry.name}</Text>
-                    <Text style={styles.entryCategoryBadge}>{entry.category}</Text>
-                  </View>
-                  <Text style={styles.entryTime}>
-                    {entry.time} · {entry.calories} cal
-                  </Text>
-                  <Text style={styles.entryMacros}>
-                    P: {entry.protein}g · C: {entry.carbs}g · F: {entry.fats}g
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(entry.id)}
+              <View key={entry.id} style={styles.swipeContainer}>
+                <ScrollView 
+                   ref={(el) => { swipeRefs.current[entry.id] = el; }}
+                   onScrollBeginDrag={() => handleScrollBeginDrag(entry.id)}
+                   horizontal 
+                   pagingEnabled 
+                   showsHorizontalScrollIndicator={false}
+                   snapToInterval={SCREEN_WIDTH - 48}
+                   decelerationRate="fast"
+                   contentContainerStyle={{ width: (SCREEN_WIDTH - 48) + 120, flexDirection: 'row' }}
                 >
-                  <Ionicons name="close" size={16} color="#CF6679" />
-                </TouchableOpacity>
+                  <View style={[styles.entryCard, { width: SCREEN_WIDTH - 48 }]}>
+                    <View style={styles.entryIcon}>
+                      <Ionicons name={getCategoryIcon(entry.category)} size={18} color="#BB86FC" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.entryName}>{entry.name}</Text>
+                        <Text style={styles.entryCategoryBadge}>{entry.category}</Text>
+                      </View>
+                      <Text style={styles.entryTime}>
+                        {entry.time} · {entry.calories} cal
+                      </Text>
+                      <Text style={styles.entryMacros}>
+                        P: {entry.protein}g · C: {entry.carbs}g · F: {entry.fats}g
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Inline Action Buttons */}
+                  <View style={styles.actionMenu}>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: '#333' }]}
+                       onPress={() => handleEdit(entry)}
+                     >
+                       <Ionicons name="pencil" size={20} color="#BB86FC" />
+                     </TouchableOpacity>
+                     <TouchableOpacity
+                       style={[styles.actionBtn, { backgroundColor: '#CF6679' }]}
+                       onPress={() => handleDelete(entry.id)}
+                     >
+                       <Ionicons name="trash" size={20} color="#fff" />
+                     </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             ))
           )}
@@ -314,15 +368,30 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: '#666',
   },
+  swipeContainer: {
+    marginBottom: 12,
+    height: 80,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  actionMenu: {
+    width: 120,
+    flexDirection: 'row',
+  },
+  actionBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   entryCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1e1e1e',
     padding: 16,
     borderRadius: 16,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#333',
+    height: '100%',
   },
   entryIcon: {
     width: 40,
@@ -358,14 +427,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
     marginTop: 2,
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#333',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',

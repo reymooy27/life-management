@@ -13,8 +13,11 @@ import {
   View,
 } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
-import { addPortfolioEntry } from '../db/database';
+import { addPortfolioEntry, updatePortfolioEntry } from '../db/database';
 import { RootStackParamList } from '../types/navigation';
+import { RouteProp, useRoute } from '@react-navigation/native';
+
+type AddInvestmentScreenRouteProp = RouteProp<RootStackParamList, 'AddInvestment'>;
 
 type AssetType = 'crypto' | 'stock' | 'gold' | 'custom';
 
@@ -27,14 +30,17 @@ const ASSET_TYPES: { key: AssetType; label: string; icon: keyof typeof Ionicons.
 
 export default function AddInvestmentScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [assetName, setAssetName] = useState('');
-  const [ticker, setTicker] = useState('');
-  const [assetType, setAssetType] = useState<AssetType>('crypto');
-  const [buyPrice, setBuyPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [notes, setNotes] = useState('');
+  const route = useRoute<AddInvestmentScreenRouteProp>();
+  const editEntry = route.params?.editEntry;
+
+  const [assetName, setAssetName] = useState(editEntry?.asset_name || '');
+  const [ticker, setTicker] = useState(editEntry?.ticker || '');
+  const [assetType, setAssetType] = useState<AssetType>(editEntry?.asset_type || 'crypto');
+  const [buyPrice, setBuyPrice] = useState(editEntry ? String(editEntry.buy_price) : '');
+  const [quantity, setQuantity] = useState(editEntry ? String(editEntry.quantity) : '');
+  const [notes, setNotes] = useState(editEntry?.notes || '');
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
+    editEntry?.date_added || new Date().toISOString().split('T')[0]
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState('');
@@ -60,15 +66,27 @@ export default function AddInvestmentScreen() {
     }
 
     setError('');
-    await addPortfolioEntry(
-      assetName.trim(),
-      ticker.trim(),
-      assetType,
-      price,
-      qty,
-      selectedDate,
-      notes.trim()
-    );
+    
+    if (editEntry) {
+      await updatePortfolioEntry(
+        editEntry.id,
+        price,
+        qty,
+        selectedDate,
+        notes.trim()
+      );
+    } else {
+      await addPortfolioEntry(
+        assetName.trim(),
+        ticker.trim(),
+        assetType,
+        price,
+        qty,
+        selectedDate,
+        notes.trim()
+      );
+    }
+    
     navigation.goBack();
   };
 
@@ -243,8 +261,10 @@ export default function AddInvestmentScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
-            <Ionicons name="add-circle" size={22} color="#000" />
-            <Text style={styles.submitButtonText}>Add Investment</Text>
+            <Ionicons name={editEntry ? "save" : "add-circle"} size={22} color="#000" />
+            <Text style={styles.submitButtonText}>
+              {editEntry ? "Save Changes" : "Add Investment"}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
