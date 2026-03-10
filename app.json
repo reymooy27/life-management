@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -21,10 +20,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.reymooy.lifeflow",
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResourcesInReleaseBuilds": true
+      "package": "com.reymooy.lifeflow"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,6 +34,21 @@
           "icon": "./assets/icon.png",
           "color": "#121212",
           "sounds": []
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf"
+          ]
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow LifeFlow to access your microphone to transcribe food logging audio.",
+          "speechRecognitionPermission": "Allow LifeFlow to securely transcribe your food logging audio to text."
         }
       ]
     ]

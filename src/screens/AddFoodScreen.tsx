@@ -1,21 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { addFoodEntry, FoodEntryRow, getRecentFoods, updateFoodEntry } from '../db/database';
 import { FoodItem, searchFoods } from '../features/food/calorieData';
 import { validateCalorieInput } from '../features/food/calorieUtils';
 import { RootStackParamList } from '../types/navigation';
-import { RouteProp, useRoute } from '@react-navigation/native';
 
 type AddFoodScreenRouteProp = RouteProp<RootStackParamList, 'AddFood'>;
 
@@ -87,7 +87,7 @@ export default function AddFoodScreen() {
     const f = fats ? validateCalorieInput(fats) || 0 : 0;
 
     setCalorieError('');
-    
+
     if (editEntry) {
       await updateFoodEntry(editEntry.id, newFoodName.trim(), cal, category, p, c, f);
     } else {
@@ -98,13 +98,17 @@ export default function AddFoodScreen() {
       });
       await addFoodEntry(newFoodName.trim(), cal, category, p, c, f, today, time);
     }
-    
+
     navigation.goBack();
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.form}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.form}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.label}>Meal Category</Text>
         <View style={styles.segmentContainer}>
           {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((cat) => (
@@ -239,7 +243,7 @@ export default function AddFoodScreen() {
             {editEntry ? "Save Changes" : "Add Food Entry"}
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       <StatusBar style="light" />
     </View>

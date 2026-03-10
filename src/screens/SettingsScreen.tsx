@@ -37,6 +37,7 @@ export default function SettingsScreen() {
   const [gender, setGender] = useState<'Male' | 'Female' | null>(null);
   const [activityLevel, setActivityLevel] = useState('');
   const [waterGoal, setWaterGoal] = useState<number | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
 
   // Notification settings
   const [waterNotifEnabled, setWaterNotifEnabled] = useState(false);
@@ -74,6 +75,7 @@ export default function SettingsScreen() {
         setWaterNotifInterval(settings.water_notif_interval_hours || 2);
         setExerciseMorningEnabled(!!settings.exercise_morning_notif_enabled);
         setExerciseAfternoonEnabled(!!settings.exercise_afternoon_notif_enabled);
+        setGeminiApiKey(settings.gemini_api_key || '');
       }
     } catch (error) {
       console.error('Failed to load settings', error);
@@ -108,6 +110,7 @@ export default function SettingsScreen() {
         water_notif_interval_hours: waterNotifInterval,
         exercise_morning_notif_enabled: exerciseMorningEnabled ? 1 : 0,
         exercise_afternoon_notif_enabled: exerciseAfternoonEnabled ? 1 : 0,
+        gemini_api_key: geminiApiKey || null,
       });
 
       // Re-initialize notifications with new settings
@@ -301,6 +304,24 @@ export default function SettingsScreen() {
               thumbColor={exerciseAfternoonEnabled ? '#121212' : '#888'}
             />
           </View>
+        </View>
+
+        {/* AI Features Section */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>AI Features</Text>
+          <Text style={styles.settingHint}>
+            To use the AI Voice Food Tracker, you will need a free Google Gemini API key from Google AI Studio.
+          </Text>
+          
+          <Text style={styles.label}>Gemini API Key</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="AIzaSy..."
+            placeholderTextColor="#666"
+            value={geminiApiKey}
+            onChangeText={setGeminiApiKey}
+            secureTextEntry={true}
+          />
         </View>
 
         {/* Save Button */}
